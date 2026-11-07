@@ -10,3 +10,6 @@ data/*.csv
 
 # macOS folder metadata
 .DS_Store
+
+# Built from the CSV by scripts/ask.py
+data/*.db

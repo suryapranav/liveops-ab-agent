@@ -9,8 +9,8 @@ Cookie Cats A/B test (~90k players; progression gate at level 30 vs 40;
 
 | Step | What | State |
 |---|---|---|
-| 1 | Deterministic analysis toolkit + tests | **Done**: 43 tests passing |
-| 2 | Agent (tools + read-only SQL) that writes a decision memo | Not started |
+| 1 | Deterministic analysis toolkit + tests | **Done** |
+| 2 | Agent (tools + read-only SQL) that writes a decision memo | **Built**: unit-tested; 2 live runs on `qwen3.5:4b` (below) |
 | 3 | Guardrails enforced in code | Not started |
 | 4 | Per-question traces (tool inputs, outputs, latency, tokens) | Not started |
 | 5 | ~30-question eval set incl. broken experiments | Not started |
@@ -41,6 +41,37 @@ caught by at least two failing tests.
 - **SRM threshold is 0.001.** SRM is a data-integrity alarm run on every
   test, so it is deliberately strict. It is a parameter.
 - **Control = `gate_30`, treatment = `gate_40`, diff = treatment − control.**
+
+## Step 2: the agent (`liveops_agent/`)
+
+Model: `qwen3.5:4b`, running locally in Ollama (thinking off, temperature 0, fixed seed).
+
+| File | What it does |
+|---|---|
+| `liveops_ab/db.py` | Builds SQLite from the CSV: `players` + one row of pre-registered `experiment` metadata (primary metric, alpha, target effect, planned split). Agent gets a **read-only** connection (`mode=ro`), enforced by SQLite. |
+| `liveops_agent/tools.py` | 5 tools: `experiment_overview`, `sample_ratio_check`, `compare_arms`, `power_check`, `run_sql` (max 50 rows). The model names a metric; tools read counts themselves and call step-1 code, so the model never feeds numbers into the statistics. Tool errors go back to the model as data. |
+| `liveops_agent/llm.py` | `OllamaClient` (plain `urllib` POST to `/api/chat`) and `ScriptedClient`, a fake model for tests. |
+| `liveops_agent/agent.py` | The loop: model → tool calls → results → … until it answers or hits `max_steps`; then one schema-constrained call for the memo. Counts LLM calls and tokens. |
+| `liveops_agent/memo.py` | Memo JSON schema (`decision`, `answer`, `key_numbers` with claimed source tool, `risks`), validation, Markdown rendering. |
+
+Tests use the scripted fake model and a fake Ollama HTTP server, so they run without
+Ollama. Six planted bugs were checked against them; five were caught. The survivor
+(fetching all SQL rows before truncating) returns identical output and only costs memory.
+
+```bash
+ollama pull qwen3.5:4b
+python scripts/ask.py "Should we ship gate_40?"
+```
+
+### First live runs (2 questions, MacBook Air, transcripts in `runs/`)
+
+| Question | Tools called | Decision | Correct? | Time | Tokens in/out |
+|---|---|---|---|---|---|
+| Should we ship gate_40? | overview, SRM, compare 7-day, power 7-day | `do_not_ship` | Yes, but skipped 1-day retention, and called the 1 pp power target a "target effect" the result failed to meet | 37.8 s | 4936 / 489 |
+| What is 1-day retention in each arm? | compare 1-day | `do_not_ship` | Numbers right; decision label wrong (should be `not_applicable`) | 18.7 s | 2202 / 290 |
+
+In both memos, every number appears in a tool output. Two runs are anecdotes, not
+an eval; step 5 measures this properly.
 
 ## Run it
 
