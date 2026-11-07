@@ -7,3 +7,6 @@ __pycache__/
 data/*.csv
 # Personal documents in this folder must never be pushed.
 *.pdf
+
+# macOS folder metadata
+.DS_Store
