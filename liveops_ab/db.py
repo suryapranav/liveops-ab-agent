@@ -30,14 +30,15 @@ CREATE TABLE experiment (
     primary_metric         TEXT NOT NULL,
     expected_share_control REAL NOT NULL,  -- planned split, e.g. 0.5
     alpha                  REAL NOT NULL,  -- significance level
-    target_mde_abs         REAL NOT NULL   -- smallest lift worth detecting
+    target_mde_abs         REAL NOT NULL,  -- effect size the power check is sized for
+    planned_users_per_arm  INTEGER         -- stopping rule; NULL if none was recorded
 );
 """
 
 
 def build_database(df, db_path, *, name="cookie_cats_gate_30_vs_40",
                    primary_metric="retention_7", expected_share_control=0.5,
-                   alpha=0.05, target_mde_abs=0.01):
+                   alpha=0.05, target_mde_abs=0.01, planned_users_per_arm=None):
     """Write a validated Cookie Cats DataFrame (see data.load_cookie_cats) to SQLite."""
     if primary_metric not in OUTCOME_METRICS:
         raise ValueError(f"primary_metric must be one of {OUTCOME_METRICS}")
@@ -54,9 +55,9 @@ def build_database(df, db_path, *, name="cookie_cats_gate_30_vs_40",
         conn.executescript(SCHEMA)
         conn.executemany("INSERT INTO players VALUES (?, ?, ?, ?, ?)", rows)
         conn.execute(
-            "INSERT INTO experiment VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO experiment VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (name, CONTROL, TREATMENT, primary_metric,
-             expected_share_control, alpha, target_mde_abs),
+             expected_share_control, alpha, target_mde_abs, planned_users_per_arm),
         )
         conn.commit()
     finally:

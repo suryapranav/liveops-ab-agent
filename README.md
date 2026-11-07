@@ -11,7 +11,7 @@ Cookie Cats A/B test (~90k players; progression gate at level 30 vs 40;
 |---|---|---|
 | 1 | Deterministic analysis toolkit + tests | **Done** |
 | 2 | Agent (tools + read-only SQL) that writes a decision memo | **Built**: unit-tested; 2 live runs on `qwen3.5:4b` (below) |
-| 3 | Guardrails enforced in code | Not started |
+| 3 | Guardrails enforced in code | **Built**: unit-tested; 3 live runs (below) |
 | 4 | Per-question traces (tool inputs, outputs, latency, tokens) | Not started |
 | 5 | ~30-question eval set incl. broken experiments | Not started |
 
@@ -72,6 +72,48 @@ python scripts/ask.py "Should we ship gate_40?"
 
 In both memos, every number appears in a tool output. Two runs are anecdotes, not
 an eval; step 5 measures this properly.
+
+## Step 3: guardrails (`liveops_agent/guardrails.py`)
+
+All enforced in code; none rely on the model following the prompt.
+
+| Guardrail | Rule | Enforced by |
+|---|---|---|
+| Read-only SQL | One SELECT/WITH statement, no comments | string check |
+| | Only SELECT / read / function actions (no PRAGMA, ATTACH, recursive CTEs) | SQLite authorizer |
+| | No writes | `mode=ro` connection |
+| | Max 50 rows, 2 s time budget | `fetchmany`, SQLite progress handler |
+| | `sum_gamerounds` may be aggregated, never used to filter, group or sort | string check |
+| Number provenance | Each `key_numbers` value must exactly match an output of the tool it cites (sign included); every number in the memo text must match some tool output (rounding allowed, sign ignored, no unit conversions) | regex + comparison; **one** rewrite request, then `blocked` |
+| No winner on bad data | `ship` / `do_not_ship` → `blocked` if: SRM (p < 0.001), arm below `planned_users_per_arm` (stopped early), power < 80% on the primary metric, or SRM / compare / power on the primary metric were never successfully called | code recomputes SRM and power from the database, not from the transcript |
+
+`inconclusive` and `not_applicable` answers are never blocked for data problems,
+but the problems are attached as warnings. The model's own decision is kept
+next to the final one, so evals can measure both.
+
+Known limits: the text check allows the numbers 1, 7, 30 and 40 without a
+source (they appear in "day 7", "gate 30"), so an invented 7 would pass. The
+SQL string check is deliberately strict: a semicolon inside a string literal
+is rejected.
+
+### Live runs with guardrails (`qwen3.5:4b`)
+
+| Question | Model said | Final | What happened |
+|---|---|---|---|
+| Should we ship gate_40? | `do_not_ship` | `blocked` | Memo said "82 basis points" (its own conversion of −0.82 pp). Asked to fix it, the model returned an identical memo. A correct decision, blocked: the cost of a strict rule. |
+| What is 1-day retention in each arm? | `do_not_ship` | `blocked` | Factual question mislabelled as a decision, with no SRM/power check. Correctly blocked. |
+| Does gate_40 work better for players with > 30 rounds? | `not_applicable` | `not_applicable` | Model refused to segment by `sum_gamerounds` (did not try SQL). But it invented a key number `sum_gamerounds = 0`, which **passed** the check: a bug. |
+
+Fix after these runs: key numbers must now be exact copies, and a value exactly
+half a unit away (0 vs alpha = 0.05) no longer counts as rounding. Rewrite requests now quote
+the offending phrase and say not to convert units. Re-checking all five saved
+transcripts with the fixed code flags exactly the "82" and the invented 0.
+These fixes have not yet been re-run live.
+
+Replaying the two live step-2 transcripts through these checks: run 1's
+`do_not_ship` stands; run 2's `do_not_ship` on a factual question is now
+`blocked` (SRM and power never checked). Eleven planted bugs in the guardrails
+were each caught by the tests.
 
 ## Run it
 

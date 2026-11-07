@@ -13,6 +13,7 @@ GOOD_MEMO = {
     "key_numbers": [{"label": "diff", "value": -2.0, "source_tool": "compare_arms"}],
     "risks": ["Underpowered"],
 }
+NO_NUMBERS_MEMO = {"decision": "inconclusive", "answer": "Unclear.", "key_numbers": [], "risks": []}
 
 
 @pytest.fixture
@@ -33,6 +34,9 @@ def test_full_loop(exp):
     assert run.tool_calls[1]["result"]["diff_pp"] == -2.0
     assert run.stop_reason == "model_finished"
     assert run.memo == GOOD_MEMO and run.memo_error is None
+    assert run.model_decision == run.final_decision == "inconclusive"
+    # 1000 users/arm is underpowered for 1 pp: reported, but an inconclusive answer stands.
+    assert [e["rule"] for e in run.guardrail_events] == ["underpowered"]
     assert run.llm_calls == 4
     assert (run.input_tokens, run.output_tokens) == (1000, 80)
 
@@ -47,18 +51,18 @@ def test_full_loop(exp):
 
 def test_max_steps_stops_a_looping_model(exp):
     looping = [scripted_tool_call("sample_ratio_check") for _ in range(3)]
-    client = ScriptedClient(looping + [scripted_text(json.dumps(GOOD_MEMO))])
+    client = ScriptedClient(looping + [scripted_text(json.dumps(NO_NUMBERS_MEMO))])
     run = run_agent("q", exp, client, max_steps=3)
     assert run.stop_reason == "max_steps"
     assert len(run.tool_calls) == 3
-    assert run.memo == GOOD_MEMO  # a memo is still requested
+    assert run.memo == NO_NUMBERS_MEMO  # a memo is still requested
 
 
 def test_tool_error_is_returned_to_model(exp):
     client = ScriptedClient([
         scripted_tool_call("compare_arms", {"metric": "sum_gamerounds"}),
         scripted_text("done"),
-        scripted_text(json.dumps(GOOD_MEMO)),
+        scripted_text(json.dumps(NO_NUMBERS_MEMO)),
     ])
     run = run_agent("q", exp, client)
     assert "unknown metric" in run.tool_calls[0]["result"]["error"]
@@ -69,6 +73,49 @@ def test_bad_memo_is_recorded_not_raised(exp):
     client = ScriptedClient([scripted_text("done"), scripted_text("not json")])
     run = run_agent("q", exp, client)
     assert run.memo is None and "not valid JSON" in run.memo_error
+    assert run.final_decision == "error"
+
+
+INVENTED = {**NO_NUMBERS_MEMO, "answer": "Retention fell by 3.7 pp."}
+
+
+def test_invented_number_triggers_one_repair(exp):
+    client = ScriptedClient([
+        scripted_text("done"),
+        scripted_text(json.dumps(INVENTED)),
+        scripted_text(json.dumps(NO_NUMBERS_MEMO)),
+    ])
+    run = run_agent("q", exp, client)
+    assert run.memo_repairs == 1 and run.unsupported_numbers == []
+    assert run.memo == NO_NUMBERS_MEMO and run.final_decision == "inconclusive"
+    assert "3.7" in client.requests[-1]["messages"][-1]["content"]  # the model was told what to fix
+
+
+def test_repair_that_fails_is_blocked(exp):
+    client = ScriptedClient([
+        scripted_text("done"),
+        scripted_text(json.dumps(INVENTED)),
+        scripted_text(json.dumps(INVENTED)),
+    ])
+    run = run_agent("q", exp, client)
+    assert run.memo_repairs == 1 and run.final_decision == "blocked"
+    assert run.model_decision == "inconclusive"
+    assert "unsupported_numbers" in [e["rule"] for e in run.guardrail_events]
+
+
+def test_replay_of_live_run_2_is_now_blocked(make_experiment):
+    # Live run 2: a factual question, only compare_arms called, memo said do_not_ship.
+    exp = make_experiment(target_mde_abs=0.10)  # healthy, so only the evidence rule can fire
+    memo = {"decision": "do_not_ship", "answer": "1-day retention is 45.0% vs 45.0%.",
+            "key_numbers": [], "risks": []}
+    client = ScriptedClient([
+        scripted_tool_call("compare_arms", {"metric": "retention_1"}),
+        scripted_text("done"),
+        scripted_text(json.dumps(memo)),
+    ])
+    run = run_agent("What is 1-day retention in each arm?", exp, client)
+    assert run.model_decision == "do_not_ship" and run.final_decision == "blocked"
+    assert [e["rule"] for e in run.guardrail_events] == ["missing_evidence"]
 
 
 @pytest.mark.parametrize("memo, fragment", [
@@ -85,6 +132,8 @@ def test_parse_memo_rejects(memo, fragment):
 def test_render_memo():
     text = render_memo("Ship?", GOOD_MEMO)
     assert "`inconclusive`" in text and "| diff | -2.0 | `compare_arms` |" in text
+    blocked = render_memo("Ship?", GOOD_MEMO, "blocked", [{"rule": "srm", "detail": "p=0.0001"}])
+    assert "overridden by guardrails" in blocked and "`srm`: p=0.0001" in blocked
 
 
 def test_parse_ollama_response():

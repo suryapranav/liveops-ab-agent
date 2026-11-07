@@ -40,7 +40,12 @@ def main():
         print(f"  {i}. {call['name']}({json.dumps(call['arguments'])})")
     print(f"\nStop reason: {run.stop_reason} | LLM calls: {run.llm_calls} | "
           f"tokens in/out: {run.input_tokens}/{run.output_tokens} | {seconds:.1f}s\n")
-    print(render_memo(args.question, run.memo) if run.memo else f"MEMO ERROR: {run.memo_error}")
+    if run.memo:
+        print(render_memo(args.question, run.memo, run.final_decision, run.guardrail_events))
+        if run.memo_repairs:
+            print(f"(memo rewritten {run.memo_repairs}x to remove unsupported numbers)")
+    else:
+        print(f"MEMO ERROR: {run.memo_error}")
 
     out = Path("runs") / f"{time.strftime('%Y%m%d-%H%M%S')}.json"
     out.parent.mkdir(exist_ok=True)

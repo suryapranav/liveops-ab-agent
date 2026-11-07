@@ -60,13 +60,18 @@ def parse_memo(text):
     return memo
 
 
-def render_memo(question, memo):
-    lines = [
-        "# Decision memo",
-        "",
-        f"**Question:** {question}",
-        "",
-        f"**Decision:** `{memo['decision']}`",
+def render_memo(question, memo, final_decision=None, guardrail_events=()):
+    final_decision = final_decision or memo["decision"]
+    lines = ["# Decision memo", "", f"**Question:** {question}", ""]
+    if final_decision == memo["decision"]:
+        lines.append(f"**Decision:** `{final_decision}`")
+    else:
+        lines.append(f"**Decision:** `{final_decision}` "
+                     f"(model proposed `{memo['decision']}`; overridden by guardrails)")
+    if guardrail_events:
+        lines += ["", "**Guardrails:**"]
+        lines += [f"- `{e['rule']}`: {e['detail']}" for e in guardrail_events]
+    lines += [
         "",
         memo["answer"],
         "",

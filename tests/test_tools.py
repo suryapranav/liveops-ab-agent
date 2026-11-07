@@ -36,8 +36,9 @@ def test_srm_tool(exp):
 
 def test_power_tool(exp):
     result = dispatch(exp, "power_check", {"metric": "retention_7"})
-    assert result["target_mde_pp"] == 1.0
-    assert result["power_at_target_mde_pct"] < 20  # 1000 users/arm is far too few for 1 pp
+    assert result["power_effect_size_pp"] == 1.0
+    assert result["power_at_that_effect_pct"] < 20  # 1000 users/arm is far too few for 1 pp
+    assert result["adequately_powered"] is False and result["power_required_pct"] == 80.0
 
 
 def test_overview(exp):
@@ -58,8 +59,15 @@ def test_sql_aggregate(exp):
 
 def test_sql_write_comes_back_as_error_not_crash(exp):
     result = dispatch(exp, "run_sql", {"query": "DELETE FROM players"})
-    assert "readonly" in result["error"]
+    assert "only SELECT" in result["error"]
     assert dispatch(exp, "run_sql", {"query": "SELECT COUNT(*) FROM players"})["rows"] == [[2000]]
+
+
+def test_sql_policy_applies_inside_the_tool(exp):
+    result = dispatch(exp, "run_sql", {"query": "SELECT version FROM players WHERE sum_gamerounds > 50"})
+    assert "post-treatment" in result["error"]
+    ok = dispatch(exp, "run_sql", {"query": "SELECT version, AVG(sum_gamerounds) FROM players GROUP BY version"})
+    assert len(ok["rows"]) == 2
 
 
 @pytest.mark.parametrize("name, args, fragment", [
@@ -67,7 +75,8 @@ def test_sql_write_comes_back_as_error_not_crash(exp):
     ("compare_arms", {}, "missing=['metric']"),
     ("compare_arms", {"metric": "sum_gamerounds"}, "unknown metric"),
     ("sample_ratio_check", {"metric": "retention_7"}, "unexpected=['metric']"),
-    ("run_sql", {"query": "SELEC nonsense"}, "OperationalError"),
+    ("run_sql", {"query": "SELEC nonsense"}, "only SELECT"),
+    ("run_sql", {"query": "SELECT FROM WHERE"}, "OperationalError"),
     ("compare_arms", "retention_7", "JSON object"),
 ])
 def test_bad_calls_return_errors(exp, name, args, fragment):

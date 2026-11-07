@@ -16,6 +16,9 @@ from liveops_ab import (OUTCOME_METRICS, achieved_power, bootstrap_diff_ci,
                         minimum_detectable_effect, srm_check, two_proportion_ztest)
 from liveops_ab.db import open_readonly
 
+from .guardrails import (MIN_POWER, check_sql, install_read_only_authorizer,
+                         run_with_time_budget)
+
 SQL_ROW_LIMIT = 50  # the model gets at most this many rows back from run_sql
 
 
@@ -29,11 +32,13 @@ class Experiment:
     expected_share_control: float
     alpha: float
     target_mde_abs: float
+    planned_users_per_arm: int | None = None  # None: older databases lack the column
 
 
 def load_experiment(db_path):
     conn = open_readonly(db_path)
     row = conn.execute("SELECT * FROM experiment").fetchone()
+    install_read_only_authorizer(conn)  # from here on, SQLite only allows reads
     return Experiment(conn=conn, **dict(row))
 
 
@@ -84,8 +89,11 @@ def experiment_overview(exp):
         "metrics": list(OUTCOME_METRICS),
         "primary_metric": exp.primary_metric,
         "alpha": exp.alpha,
-        "target_mde_pp": _pct(exp.target_mde_abs),
-        "note": "sum_gamerounds is affected by the treatment; never segment by it.",
+        "power_effect_size_pp": _pct(exp.target_mde_abs),
+        "planned_users_per_arm": exp.planned_users_per_arm,
+        "notes": ["power_effect_size_pp is the effect the power check is sized for, "
+                  "not a goal the result must reach.",
+                  "sum_gamerounds is affected by the treatment; never segment by it."],
     }
 
 
@@ -121,6 +129,7 @@ def compare_arms(exp, metric):
         "z": round(t.z, 2),
         "p_value": _sig(t.p_value),
         "alpha": exp.alpha,
+        "confidence_level_pct": _pct(1 - exp.alpha),
         "significant": t.p_value < exp.alpha,
     }
 
@@ -129,22 +138,27 @@ def power_check(exp, metric):
     x_a, n_a, x_b, n_b = _arm_counts(exp, metric)
     baseline = x_a / n_a
     power = achieved_power(n_a, n_b, baseline, exp.target_mde_abs, alpha=exp.alpha)
-    mde = minimum_detectable_effect(n_a, n_b, baseline, alpha=exp.alpha)
+    mde = minimum_detectable_effect(n_a, n_b, baseline, alpha=exp.alpha, power=MIN_POWER)
     return {
         "metric": metric,
-        "target_mde_pp": _pct(exp.target_mde_abs),
-        "power_at_target_mde_pct": _pct(power),
-        "mde_at_80pct_power_pp": _pct(mde),
+        "power_effect_size_pp": _pct(exp.target_mde_abs),
+        "power_at_that_effect_pct": _pct(power),
+        "power_required_pct": _pct(MIN_POWER),
+        "adequately_powered": power >= MIN_POWER,
+        "min_detectable_effect_at_required_power_pp": _pct(mde),
     }
 
 
 def run_sql(exp, query):
-    """Run a query on the read-only connection; return at most SQL_ROW_LIMIT rows."""
-    cursor = exp.conn.execute(query)
-    if cursor.description is None:  # statement that returns no rows
-        return {"columns": [], "rows": [], "truncated": False}
-    columns = [d[0] for d in cursor.description]
-    rows = cursor.fetchmany(SQL_ROW_LIMIT + 1)  # one extra row tells us if there are more
+    """Run one checked SELECT; return at most SQL_ROW_LIMIT rows.
+
+    Three locks: check_sql (policy), the authorizer (SQLite refuses
+    non-reads), and the mode=ro connection (SQLite refuses writes)."""
+    reason = check_sql(query)
+    if reason:
+        return {"error": f"query rejected: {reason}"}
+    # Fetch one extra row: if it exists, the result was truncated.
+    columns, rows = run_with_time_budget(exp.conn, query, SQL_ROW_LIMIT + 1)
     return {
         "columns": columns,
         "rows": [list(r) for r in rows[:SQL_ROW_LIMIT]],
@@ -185,10 +199,10 @@ TOOL_SCHEMAS = [
             "Compares a retention metric between control and treatment: rates, difference in percentage points, confidence intervals, p-value.",
             _METRIC_PARAM),
     _schema("power_check",
-            "Says whether the experiment had enough users to detect the target effect on a metric.",
+            "Says whether the experiment had enough users to reliably detect the pre-registered effect size on a metric.",
             _METRIC_PARAM),
     _schema("run_sql",
-            f"Read-only SQLite query on table players(userid, version, sum_gamerounds, retention_1, retention_7). Returns at most {SQL_ROW_LIMIT} rows. Use only when the other tools cannot answer.",
+            f"Read-only SQLite query on table players(userid, version, sum_gamerounds, retention_1, retention_7). Returns at most {SQL_ROW_LIMIT} rows. sum_gamerounds may only be aggregated (e.g. AVG), never used to filter or group. Use only when the other tools cannot answer.",
             {"type": "object",
              "properties": {"query": {"type": "string", "description": "One SELECT statement."}},
              "required": ["query"]}),
