@@ -25,6 +25,12 @@ class ChatResponse:
     input_tokens: int
     output_tokens: int
     message: dict                  # the assistant message, to append to the history as-is
+    server_timings_ms: dict = field(default_factory=dict)  # Ollama's own timings, if any
+
+
+# Ollama reports these in nanoseconds. load_duration is model loading: large
+# on a cold start, which explains a slow first call in a trace.
+_OLLAMA_TIMINGS = ("total_duration", "load_duration", "prompt_eval_duration", "eval_duration")
 
 
 def parse_ollama_response(data):
@@ -42,6 +48,7 @@ def parse_ollama_response(data):
         input_tokens=data.get("prompt_eval_count", 0),
         output_tokens=data.get("eval_count", 0),
         message=message,
+        server_timings_ms={k: round(data[k] / 1e6, 1) for k in _OLLAMA_TIMINGS if k in data},
     )
 
 

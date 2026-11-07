@@ -12,7 +12,7 @@ Cookie Cats A/B test (~90k players; progression gate at level 30 vs 40;
 | 1 | Deterministic analysis toolkit + tests | **Done** |
 | 2 | Agent (tools + read-only SQL) that writes a decision memo | **Built**: unit-tested; 2 live runs on `qwen3.5:4b` (below) |
 | 3 | Guardrails enforced in code | **Built**: unit-tested; 3 live runs (below) |
-| 4 | Per-question traces (tool inputs, outputs, latency, tokens) | Not started |
+| 4 | Per-question traces (tool inputs, outputs, latency, tokens) | **Built**: unit-tested; 2 live traces (below) |
 | 5 | ~30-question eval set incl. broken experiments | Not started |
 
 ## Step 1: analysis toolkit (`liveops_ab/`)
@@ -108,12 +108,50 @@ Fix after these runs: key numbers must now be exact copies, and a value exactly
 half a unit away (0 vs alpha = 0.05) no longer counts as rounding. Rewrite requests now quote
 the offending phrase and say not to convert units. Re-checking all five saved
 transcripts with the fixed code flags exactly the "82" and the invented 0.
-These fixes have not yet been re-run live.
+Re-run of "Should we ship gate_40?" after the fixes: `do_not_ship`, every number copied
+from tools, no rewrite needed (25.5 s, 5,211 / 433 tokens). One run; whether the
+clearer instructions caused this is for the evals to show. Not checked by any guardrail: prose
+claims. This memo says the result "contradicts the expected positive effect", but no
+expected direction was ever recorded.
 
 Replaying the two live step-2 transcripts through these checks: run 1's
 `do_not_ship` stands; run 2's `do_not_ship` on a factual question is now
 `blocked` (SRM and power never checked). Eleven planted bugs in the guardrails
 were each caught by the tests.
+
+## Step 4: observability (`liveops_agent/trace.py`, `scripts/trace_report.py`)
+
+Every question produces one trace file in `traces/`: an ordered list of **spans**,
+one per model call, tool call and guardrail check.
+
+| Span kind | Input | Output | Also recorded |
+|---|---|---|---|
+| `llm` (`agent_step_N`, `memo`, `memo_repair_N`) | messages added since the model last spoke, tools offered, whether JSON schema was enforced | text, tool calls | latency, tokens in/out, Ollama's own timings (incl. model load time) |
+| `tool` | arguments | result | latency, error (tool errors are returned to the model, and flagged here) |
+| `guardrail` (`number_check`, `decision_policy`) | state before the check | problems found / final decision and events | latency |
+
+Each trace also holds the full message history, the memo, model vs final decision,
+and per-kind totals. `python scripts/trace_report.py` aggregates a folder of traces:
+p50/p95 latency, LLM calls and tokens per question, tool errors by tool, `max_steps`
+hits, memo rewrites, final decisions, and how often (and why) guardrails overrode the model.
+
+Tested with a fake clock (exact durations), including spans recorded when a step raises.
+Seven planted bugs (e.g. tool errors not traced, ns→ms conversion, percentile rounding)
+were each caught. Transcripts in `runs/` predate tracing.
+
+### What the first two live traces showed
+
+- **The rewrite step can satisfy the check without fixing the error.** The first memo listed
+  `srm_detected = 0.00155` citing `sample_ratio_check`: that is compare_arms' p-value. The
+  number check caught it. Asked to fix it, the model kept the label and swapped in 0.00861, the
+  SRM p-value, which *does* appear in that tool's output. The check passed; the label is still
+  wrong (`srm_detected` is a true/false flag). The check verifies that a value exists in
+  the cited tool's output, not what the value means.
+- **Factual questions are labelled as decisions.** "What is 7-day retention in each arm?" was
+  labelled `do_not_ship` again (3 of 3 factual questions so far) and blocked for missing evidence.
+- **Where the time goes:** generation runs at ~20 tokens/s; the memo call (~245 output
+  tokens) takes ~13.5 s, two-thirds of a run without a rewrite. A rewrite doubles that. Model
+  load time was under 50 ms per call (model already warm).
 
 ## Run it
 
@@ -122,6 +160,8 @@ pip install -e ".[dev]"   # makes `liveops_ab` importable from anywhere
 pytest
 # download cookie_cats.csv from Kaggle into data/, then:
 python scripts/analyze_cookie_cats.py data/cookie_cats.csv
+python scripts/ask.py "Should we ship gate_40?"   # needs Ollama + qwen3.5:4b
+python scripts/trace_report.py                     # summarise traces/
 ```
 
 ## Results (step 1, toolkit only, no agent yet)
