@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "liveops-ab-agent"
+version = "0.1.0"
+description = "An LLM agent that analyses A/B experiments, with guardrails, observability and evals."
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "pandas>=2.0"]
+
+[project.optional-dependencies]
+# scipy is only used by tests, as an independent reference implementation.
+dev = ["pytest>=7", "scipy>=1.10"]
+
+[tool.setuptools]
+packages = ["liveops_ab"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

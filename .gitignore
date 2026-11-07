@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+*.egg-info/
+# Dataset is downloaded from Kaggle, not committed.
+data/*.csv
+# Personal documents in this folder must never be pushed.
+*.pdf
