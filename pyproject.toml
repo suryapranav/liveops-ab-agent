@@ -14,7 +14,7 @@ dependencies = ["numpy>=1.24", "pandas>=2.0"]
 dev = ["pytest>=7", "scipy>=1.10"]
 
 [tool.setuptools]
-packages = ["liveops_ab", "liveops_agent"]
+packages = ["liveops_ab", "liveops_agent", "liveops_evals"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

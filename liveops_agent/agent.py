@@ -34,7 +34,7 @@ Rules:
 MEMO_INSTRUCTION = """Now write the decision memo as JSON.
 - decision: "ship", "do_not_ship", "inconclusive", or "not_applicable" if the question is not a ship decision.
 - answer: a short paragraph answering the question.
-- key_numbers: every number the answer uses, copied exactly as it appears in a tool result, with the name of that tool.
+- key_numbers: every number the answer uses, as source_tool (the tool that returned it), field (the exact field name in that tool's result) and value (copied exactly). Numeric fields only: leave out true/false fields such as srm_detected.
 - Keep the units used in the tool results (percent, percentage points). Do not convert units or do arithmetic.
 - risks: caveats a decision-maker should know.
 Use only numbers that appear in the tool results above."""

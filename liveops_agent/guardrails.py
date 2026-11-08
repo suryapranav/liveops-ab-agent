@@ -82,7 +82,11 @@ TEXT_NUMBER_ALLOWLIST = {1.0, 7.0, 30.0, 40.0}
 
 # A number not glued to a word or a dot before it, so the 7 in "retention_7"
 # and the 40 in "gate_40" are not picked up.
-_NUMBER_IN_TEXT = re.compile(r"(?<![\w.])[-+]?\d+(?:\.\d+)?")
+# Includes scientific notation: "3.41e-22" is one number, not 3.41 and 22
+# (a live eval run showed the split version blocking correct memos).
+_NUMBER_IN_TEXT = re.compile(r"(?<![\w.])[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
+# A comma between digits followed by exactly three digits is a thousands separator.
+_THOUSANDS_SEPARATOR = re.compile(r"(?<=\d),(?=\d{3}(?!\d))")
 
 
 def _numbers_in(obj):
@@ -118,9 +122,45 @@ def _text_number_supported(written_text, sources):
     return any(_is_rounding_of(written, abs(value), decimals) for value in sources)
 
 
-def _key_number_supported(value, sources):
-    """key_numbers are meant to be copied exactly: no rounding, sign included."""
-    return any(abs(value - source) < 1e-9 for source in sources)
+_ROW_CELL = re.compile(r"rows\[(\d+)\]\[(\d+)\]")
+
+
+def _field_values(result, field):
+    """Values of `field` in one tool result: a plain key (compare_arms'
+    "p_value"), a run_sql column name, or a run_sql cell like "rows[0][1]"."""
+    if field in result and not isinstance(result[field], (dict, list)):
+        return [result[field]]
+    cell = _ROW_CELL.fullmatch(field)
+    if cell and "rows" in result:
+        row, column = int(cell.group(1)), int(cell.group(2))
+        rows = result["rows"]
+        return [rows[row][column]] if row < len(rows) and column < len(rows[row]) else []
+    if field in result.get("columns", []):
+        index = result["columns"].index(field)
+        return [row[index] for row in result.get("rows", [])]
+    return []
+
+
+def _key_number_supported(item, tool_calls):
+    """True if some call of item's source_tool returned exactly item's value
+    in item's field. Exact: key numbers are copies, so no rounding, sign
+    included. Booleans never match (True is not the number 1)."""
+    for call in tool_calls:
+        if call["name"] != item["source_tool"] or not isinstance(call["result"], dict):
+            continue
+        for value in _field_values(call["result"], item["field"]):
+            if (isinstance(value, (int, float)) and not isinstance(value, bool)
+                    and abs(value - item["value"]) < 1e-9):
+                return True
+    return False
+
+
+def _is_flag(item, tool_calls):
+    """Is the cited field a true/false flag in the cited tool's output?
+    (Live evals: the model often cites srm_detected / adequately_powered as 0 or 1.)"""
+    return any(call["name"] == item["source_tool"] and isinstance(call["result"], dict)
+               and isinstance(call["result"].get(item["field"]), bool)
+               for call in tool_calls)
 
 
 def _context(text, start, end, width=40):
@@ -132,8 +172,8 @@ def _context(text, start, end, width=40):
 def find_unsupported_numbers(memo, tool_calls):
     """List every number in the memo that no tool output supports.
 
-    - key_numbers: the value must EXACTLY match an output of the tool it
-      cites, sign included.
+    - key_numbers: the cited tool must have returned EXACTLY this value in
+      the cited field (sign included).
     - answer / risks text: each number must match SOME tool output. Sign is
       ignored, because prose carries it in words ("fell by 0.82 pp").
     """
@@ -141,14 +181,17 @@ def find_unsupported_numbers(memo, tool_calls):
     all_values = [n for call in tool_calls for n in _numbers_in(call["result"])]
 
     for item in memo["key_numbers"]:
-        cited = [n for call in tool_calls if call["name"] == item["source_tool"]
-                 for n in _numbers_in(call["result"])]
-        if not _key_number_supported(float(item["value"]), cited):
-            problems.append(f"key number {item['label']}={item['value']} not found in "
-                            f"output of {item['source_tool']}")
+        if _is_flag(item, tool_calls):
+            problems.append(f"key number {item['source_tool']}.{item['field']}: that field is "
+                            f"true/false, not a number. Remove it from key_numbers.")
+        elif not _key_number_supported(item, tool_calls):
+            problems.append(f"key number {item['source_tool']}.{item['field']} = {item['value']}: "
+                            f"no {item['source_tool']} result has that value in field "
+                            f"\"{item['field']}\"")
 
     texts = [memo["answer"], *memo["risks"]]
     for text in texts:
+        text = _THOUSANDS_SEPARATOR.sub("", text)  # "44,700" -> "44700"
         for match in _NUMBER_IN_TEXT.finditer(text):
             number = match.group().lstrip("+")
             if abs(float(number)) in TEXT_NUMBER_ALLOWLIST:

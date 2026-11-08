@@ -4,9 +4,11 @@ The memo is requested with Ollama's `format` = MEMO_SCHEMA, which constrains
 the model's output to valid JSON of this shape. We still validate it here,
 because a different backend might not enforce the schema.
 
-key_numbers lists each number the memo relies on together with the tool it
-claims to come from. Step 3 (guardrails) checks those claims against the
-actual tool outputs.
+key_numbers lists each number the memo relies on as (source_tool, field,
+value): the tool, the exact field name in that tool's result, and the value.
+The guardrails check result[field] == value. There is deliberately no
+free-text label: a live run showed the model attaching a wrong label
+("srm_detected") to a real number, so the field name IS the label.
 """
 import json
 
@@ -22,11 +24,11 @@ MEMO_SCHEMA = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "label": {"type": "string"},
-                    "value": {"type": "number"},
                     "source_tool": {"type": "string"},
+                    "field": {"type": "string"},
+                    "value": {"type": "number"},
                 },
-                "required": ["label", "value", "source_tool"],
+                "required": ["source_tool", "field", "value"],
             },
         },
         "risks": {"type": "array", "items": {"type": "string"}},
@@ -53,10 +55,10 @@ def parse_memo(text):
     if memo["decision"] not in DECISIONS:
         raise MemoError(f"decision must be one of {DECISIONS}, got {memo['decision']!r}")
     for item in memo["key_numbers"]:
-        if not isinstance(item, dict) or not {"label", "value", "source_tool"} <= item.keys():
+        if not isinstance(item, dict) or not {"source_tool", "field", "value"} <= item.keys():
             raise MemoError(f"bad key_numbers entry: {item!r}")
         if isinstance(item["value"], bool) or not isinstance(item["value"], (int, float)):
-            raise MemoError(f"key number {item['label']!r} is not a number")
+            raise MemoError(f"key number {item['field']!r} is not a number")
     return memo
 
 
@@ -77,10 +79,10 @@ def render_memo(question, memo, final_decision=None, guardrail_events=()):
         "",
         "## Key numbers",
         "",
-        "| Number | Value | Source tool |",
+        "| Source tool | Field | Value |",
         "|---|---|---|",
     ]
-    lines += [f"| {k['label']} | {k['value']} | `{k['source_tool']}` |" for k in memo["key_numbers"]]
+    lines += [f"| `{k['source_tool']}` | `{k['field']}` | {k['value']} |" for k in memo["key_numbers"]]
     lines += ["", "## Risks", ""]
     lines += [f"- {risk}" for risk in memo["risks"]] or ["- None stated"]
     return "\n".join(lines) + "\n"

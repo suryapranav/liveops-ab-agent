@@ -1,0 +1,663 @@
+{
+ "case": "F07",
+ "repeat": 2,
+ "question": "What is the average number of game rounds played in each arm?",
+ "trace_id": "d1f37e07d4c0",
+ "started_at": "2026-11-07T23:41:37+0530",
+ "tool_calls": [
+  {
+   "name": "run_sql",
+   "arguments": {
+    "query": "SELECT arm, AVG(sum_gamerounds) as avg_rounds FROM players GROUP BY arm"
+   },
+   "result": {
+    "error": "OperationalError: no such column: arm"
+   }
+  },
+  {
+   "name": "experiment_overview",
+   "arguments": {},
+   "result": {
+    "experiment": "cookie_cats_real",
+    "control_arm": "gate_30",
+    "treatment_arm": "gate_40",
+    "control_users": 44700,
+    "treatment_users": 45489,
+    "metrics": [
+     "retention_1",
+     "retention_7"
+    ],
+    "primary_metric": "retention_7",
+    "alpha": 0.05,
+    "power_effect_size_pp": 1.0,
+    "planned_users_per_arm": null,
+    "notes": [
+     "power_effect_size_pp is the effect the power check is sized for, not a goal the result must reach.",
+     "sum_gamerounds is affected by the treatment; never segment by it."
+    ]
+   }
+  },
+  {
+   "name": "run_sql",
+   "arguments": {
+    "query": "SELECT gate_30, AVG(sum_gamerounds) as avg_rounds FROM players WHERE version = 'gate_30' GROUP BY gate_30"
+   },
+   "result": {
+    "error": "OperationalError: no such column: gate_30"
+   }
+  },
+  {
+   "name": "run_sql",
+   "arguments": {
+    "query": "SELECT version, AVG(sum_gamerounds) as avg_rounds FROM players GROUP BY version"
+   },
+   "result": {
+    "columns": [
+     "version",
+     "avg_rounds"
+    ],
+    "rows": [
+     [
+      "gate_30",
+      52.45626398210291
+     ],
+     [
+      "gate_40",
+      51.29877552814966
+     ]
+    ],
+    "truncated": false
+   }
+  }
+ ],
+ "messages": [
+  {
+   "role": "system",
+   "content": "You are an A/B test analyst for a mobile game. Answer the user's question about the experiment by calling tools.\n\nRules:\n- Never calculate or guess numbers yourself. Every number you use must come from a tool result.\n- For a ship / don't-ship question, call experiment_overview, sample_ratio_check, then compare_arms and power_check for every metric before deciding.\n- If sample_ratio_check reports srm_detected = true, the data is untrustworthy: do not recommend shipping.\n- Never segment or filter by sum_gamerounds: it is affected by the treatment.\n- When you have what you need, reply in one short paragraph without calling a tool."
+  },
+  {
+   "role": "user",
+   "content": "What is the average number of game rounds played in each arm?"
+  },
+  {
+   "role": "assistant",
+   "content": "",
+   "tool_calls": [
+    {
+     "id": "call_pc5i1822",
+     "function": {
+      "index": 0,
+      "name": "run_sql",
+      "arguments": {
+       "query": "SELECT arm, AVG(sum_gamerounds) as avg_rounds FROM players GROUP BY arm"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "role": "tool",
+   "tool_name": "run_sql",
+   "content": "{\"error\": \"OperationalError: no such column: arm\"}"
+  },
+  {
+   "role": "assistant",
+   "content": "",
+   "tool_calls": [
+    {
+     "id": "call_zkiex2ym",
+     "function": {
+      "index": 0,
+      "name": "experiment_overview",
+      "arguments": {}
+     }
+    }
+   ]
+  },
+  {
+   "role": "tool",
+   "tool_name": "experiment_overview",
+   "content": "{\"experiment\": \"cookie_cats_real\", \"control_arm\": \"gate_30\", \"treatment_arm\": \"gate_40\", \"control_users\": 44700, \"treatment_users\": 45489, \"metrics\": [\"retention_1\", \"retention_7\"], \"primary_metric\": \"retention_7\", \"alpha\": 0.05, \"power_effect_size_pp\": 1.0, \"planned_users_per_arm\": null, \"notes\": [\"power_effect_size_pp is the effect the power check is sized for, not a goal the result must reach.\", \"sum_gamerounds is affected by the treatment; never segment by it.\"]}"
+  },
+  {
+   "role": "assistant",
+   "content": "",
+   "tool_calls": [
+    {
+     "id": "call_yp67rh6j",
+     "function": {
+      "index": 0,
+      "name": "run_sql",
+      "arguments": {
+       "query": "SELECT gate_30, AVG(sum_gamerounds) as avg_rounds FROM players WHERE version = 'gate_30' GROUP BY gate_30"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "role": "tool",
+   "tool_name": "run_sql",
+   "content": "{\"error\": \"OperationalError: no such column: gate_30\"}"
+  },
+  {
+   "role": "assistant",
+   "content": "",
+   "tool_calls": [
+    {
+     "id": "call_0v8b9uxy",
+     "function": {
+      "index": 0,
+      "name": "run_sql",
+      "arguments": {
+       "query": "SELECT version, AVG(sum_gamerounds) as avg_rounds FROM players GROUP BY version"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "role": "tool",
+   "tool_name": "run_sql",
+   "content": "{\"columns\": [\"version\", \"avg_rounds\"], \"rows\": [[\"gate_30\", 52.45626398210291], [\"gate_40\", 51.29877552814966]], \"truncated\": false}"
+  },
+  {
+   "role": "assistant",
+   "content": "The average number of game rounds played in the control arm (gate_30) is approximately 52.46, and in the treatment arm (gate_40) is approximately 51.30."
+  },
+  {
+   "role": "user",
+   "content": "Now write the decision memo as JSON.\n- decision: \"ship\", \"do_not_ship\", \"inconclusive\", or \"not_applicable\" if the question is not a ship decision.\n- answer: a short paragraph answering the question.\n- key_numbers: every number the answer uses, as source_tool (the tool that returned it), field (the exact field name in that tool's result) and value (copied exactly).\n- Keep the units used in the tool results (percent, percentage points). Do not convert units or do arithmetic.\n- risks: caveats a decision-maker should know.\nUse only numbers that appear in the tool results above."
+  },
+  {
+   "role": "assistant",
+   "content": "{\"decision\": \"not_applicable\", \"answer\": \"The question asks for average game rounds per arm, which is a descriptive statistic rather than a ship decision; however, the control arm (gate_30) had an average of 52.46 rounds and the treatment arm (gate_40) had an average of 51.30 rounds based on the version aggregation query.\", \"key_numbers\": [{\"source_tool\": \"run_sql\", \"field\": \"rows[0][1]\", \"value\": 52.45626398210291}, {\"source_tool\": \"run_sql\", \"field\": \"rows[1][1]\", \"value\": 51.29877552814966}], \"risks\": [\"sum_gamerounds is affected by the treatment and should not be used for segmentation or filtering as per experiment notes.\"]}"
+  },
+  {
+   "role": "user",
+   "content": "These numbers in your memo do not appear in any tool result:\n- key number run_sql.rows[0][1] = 52.45626398210291: no run_sql result has that value in field \"rows[0][1]\"\n- key number run_sql.rows[1][1] = 51.29877552814966: no run_sql result has that value in field \"rows[1][1]\"\nRewrite the memo as JSON. For each one, use the number exactly as written in a tool result,\nin the same units (do not convert, e.g. to basis points), or delete it."
+  },
+  {
+   "role": "assistant",
+   "content": "{\"decision\": \"not_applicable\", \"answer\": \"The question asks for average game rounds per arm, which is a descriptive statistic rather than a ship decision; however, the control arm (gate_30) had an average of 52.46 rounds and the treatment arm (gate_40) had an average of 51.30 rounds based on the version aggregation query.\", \"key_numbers\": [{\"source_tool\": \"run_sql\", \"field\": \"rows[0][1]\", \"value\": 52.45626398210291}, {\"source_tool\": \"run_sql\", \"field\": \"rows[1][1]\", \"value\": 51.29877552814966}], \"risks\": [\"sum_gamerounds is affected by the treatment and should not be used for segmentation or filtering as per experiment notes.\"]}"
+  }
+ ],
+ "llm_calls": 7,
+ "input_tokens": 7065,
+ "output_tokens": 594,
+ "stop_reason": "model_finished",
+ "memo": {
+  "decision": "not_applicable",
+  "answer": "The question asks for average game rounds per arm, which is a descriptive statistic rather than a ship decision; however, the control arm (gate_30) had an average of 52.46 rounds and the treatment arm (gate_40) had an average of 51.30 rounds based on the version aggregation query.",
+  "key_numbers": [
+   {
+    "source_tool": "run_sql",
+    "field": "rows[0][1]",
+    "value": 52.45626398210291
+   },
+   {
+    "source_tool": "run_sql",
+    "field": "rows[1][1]",
+    "value": 51.29877552814966
+   }
+  ],
+  "risks": [
+   "sum_gamerounds is affected by the treatment and should not be used for segmentation or filtering as per experiment notes."
+  ]
+ },
+ "memo_error": null,
+ "memo_repairs": 1,
+ "unsupported_numbers": [
+  "key number run_sql.rows[0][1] = 52.45626398210291: no run_sql result has that value in field \"rows[0][1]\"",
+  "key number run_sql.rows[1][1] = 51.29877552814966: no run_sql result has that value in field \"rows[1][1]\""
+ ],
+ "model_decision": "not_applicable",
+ "final_decision": "blocked",
+ "guardrail_events": [
+  {
+   "rule": "unsupported_numbers",
+   "detail": "key number run_sql.rows[0][1] = 52.45626398210291: no run_sql result has that value in field \"rows[0][1]\"; key number run_sql.rows[1][1] = 51.29877552814966: no run_sql result has that value in field \"rows[1][1]\""
+  }
+ ],
+ "duration_ms": 53115.1,
+ "spans": [
+  {
+   "kind": "llm",
+   "name": "agent_step_1",
+   "start_ms": 0.1,
+   "duration_ms": 3678.1,
+   "input": {
+    "new_messages": [
+     {
+      "role": "system",
+      "content": "You are an A/B test analyst for a mobile game. Answer the user's question about the experiment by calling tools.\n\nRules:\n- Never calculate or guess numbers yourself. Every number you use must come from a tool result.\n- For a ship / don't-ship question, call experiment_overview, sample_ratio_check, then compare_arms and power_check for every metric before deciding.\n- If sample_ratio_check reports srm_detected = true, the data is untrustworthy: do not recommend shipping.\n- Never segment or filter by sum_gamerounds: it is affected by the treatment.\n- When you have what you need, reply in one short paragraph without calling a tool."
+     },
+     {
+      "role": "user",
+      "content": "What is the average number of game rounds played in each arm?"
+     }
+    ],
+    "context_messages": 2,
+    "tools_offered": [
+     "experiment_overview",
+     "sample_ratio_check",
+     "compare_arms",
+     "power_check",
+     "run_sql"
+    ],
+    "json_schema": false
+   },
+   "output": {
+    "content": "",
+    "tool_calls": [
+     {
+      "name": "run_sql",
+      "arguments": {
+       "query": "SELECT arm, AVG(sum_gamerounds) as avg_rounds FROM players GROUP BY arm"
+      }
+     }
+    ],
+    "server_timings_ms": {
+     "total_duration": 3676.0,
+     "load_duration": 16.5,
+     "prompt_eval_duration": 399.9,
+     "eval_duration": 3153.4
+    }
+   },
+   "error": null,
+   "input_tokens": 786,
+   "output_tokens": 42
+  },
+  {
+   "kind": "tool",
+   "name": "run_sql",
+   "start_ms": 3678.2,
+   "duration_ms": 13.2,
+   "input": {
+    "query": "SELECT arm, AVG(sum_gamerounds) as avg_rounds FROM players GROUP BY arm"
+   },
+   "output": {
+    "error": "OperationalError: no such column: arm"
+   },
+   "error": "OperationalError: no such column: arm",
+   "input_tokens": 0,
+   "output_tokens": 0
+  },
+  {
+   "kind": "llm",
+   "name": "agent_step_2",
+   "start_ms": 3691.5,
+   "duration_ms": 2148.6,
+   "input": {
+    "new_messages": [
+     {
+      "role": "tool",
+      "tool_name": "run_sql",
+      "content": "{\"error\": \"OperationalError: no such column: arm\"}"
+     }
+    ],
+    "context_messages": 4,
+    "tools_offered": [
+     "experiment_overview",
+     "sample_ratio_check",
+     "compare_arms",
+     "power_check",
+     "run_sql"
+    ],
+    "json_schema": false
+   },
+   "output": {
+    "content": "",
+    "tool_calls": [
+     {
+      "name": "experiment_overview",
+      "arguments": {}
+     }
+    ],
+    "server_timings_ms": {
+     "total_duration": 2146.9,
+     "load_duration": 42.3,
+     "prompt_eval_duration": 888.7,
+     "eval_duration": 1058.8
+    }
+   },
+   "error": null,
+   "input_tokens": 856,
+   "output_tokens": 15
+  },
+  {
+   "kind": "tool",
+   "name": "experiment_overview",
+   "start_ms": 5840.1,
+   "duration_ms": 15.2,
+   "input": {},
+   "output": {
+    "experiment": "cookie_cats_real",
+    "control_arm": "gate_30",
+    "treatment_arm": "gate_40",
+    "control_users": 44700,
+    "treatment_users": 45489,
+    "metrics": [
+     "retention_1",
+     "retention_7"
+    ],
+    "primary_metric": "retention_7",
+    "alpha": 0.05,
+    "power_effect_size_pp": 1.0,
+    "planned_users_per_arm": null,
+    "notes": [
+     "power_effect_size_pp is the effect the power check is sized for, not a goal the result must reach.",
+     "sum_gamerounds is affected by the treatment; never segment by it."
+    ]
+   },
+   "error": null,
+   "input_tokens": 0,
+   "output_tokens": 0
+  },
+  {
+   "kind": "llm",
+   "name": "agent_step_3",
+   "start_ms": 5855.4,
+   "duration_ms": 5311.4,
+   "input": {
+    "new_messages": [
+     {
+      "role": "tool",
+      "tool_name": "experiment_overview",
+      "content": "{\"experiment\": \"cookie_cats_real\", \"control_arm\": \"gate_30\", \"treatment_arm\": \"gate_40\", \"control_users\": 44700, \"treatment_users\": 45489, \"metrics\": [\"retention_1\", \"retention_7\"], \"primary_metric\": \"retention_7\", \"alpha\": 0.05, \"power_effect_size_pp\": 1.0, \"planned_users_per_arm\": null, \"notes\": [\"power_effect_size_pp is the effect the power check is sized for, not a goal the result must reach.\", \"sum_gamerounds is affected by the treatment; never segment by it.\"]}"
+     }
+    ],
+    "context_messages": 6,
+    "tools_offered": [
+     "experiment_overview",
+     "sample_ratio_check",
+     "compare_arms",
+     "power_check",
+     "run_sql"
+    ],
+    "json_schema": false
+   },
+   "output": {
+    "content": "",
+    "tool_calls": [
+     {
+      "name": "run_sql",
+      "arguments": {
+       "query": "SELECT gate_30, AVG(sum_gamerounds) as avg_rounds FROM players WHERE version = 'gate_30' GROUP BY gate_30"
+      }
+     }
+    ],
+    "server_timings_ms": {
+     "total_duration": 5309.7,
+     "load_duration": 28.6,
+     "prompt_eval_duration": 1455.1,
+     "eval_duration": 3798.8
+    }
+   },
+   "error": null,
+   "input_tokens": 1034,
+   "output_tokens": 57
+  },
+  {
+   "kind": "tool",
+   "name": "run_sql",
+   "start_ms": 11166.8,
+   "duration_ms": 0.5,
+   "input": {
+    "query": "SELECT gate_30, AVG(sum_gamerounds) as avg_rounds FROM players WHERE version = 'gate_30' GROUP BY gate_30"
+   },
+   "output": {
+    "error": "OperationalError: no such column: gate_30"
+   },
+   "error": "OperationalError: no such column: gate_30",
+   "input_tokens": 0,
+   "output_tokens": 0
+  },
+  {
+   "kind": "llm",
+   "name": "agent_step_4",
+   "start_ms": 11167.4,
+   "duration_ms": 3858.0,
+   "input": {
+    "new_messages": [
+     {
+      "role": "tool",
+      "tool_name": "run_sql",
+      "content": "{\"error\": \"OperationalError: no such column: gate_30\"}"
+     }
+    ],
+    "context_messages": 8,
+    "tools_offered": [
+     "experiment_overview",
+     "sample_ratio_check",
+     "compare_arms",
+     "power_check",
+     "run_sql"
+    ],
+    "json_schema": false
+   },
+   "output": {
+    "content": "",
+    "tool_calls": [
+     {
+      "name": "run_sql",
+      "arguments": {
+       "query": "SELECT version, AVG(sum_gamerounds) as avg_rounds FROM players GROUP BY version"
+      }
+     }
+    ],
+    "server_timings_ms": {
+     "total_duration": 3854.8,
+     "load_duration": 42.0,
+     "prompt_eval_duration": 794.5,
+     "eval_duration": 2982.6
+    }
+   },
+   "error": null,
+   "input_tokens": 1122,
+   "output_tokens": 42
+  },
+  {
+   "kind": "tool",
+   "name": "run_sql",
+   "start_ms": 15025.4,
+   "duration_ms": 53.8,
+   "input": {
+    "query": "SELECT version, AVG(sum_gamerounds) as avg_rounds FROM players GROUP BY version"
+   },
+   "output": {
+    "columns": [
+     "version",
+     "avg_rounds"
+    ],
+    "rows": [
+     [
+      "gate_30",
+      52.45626398210291
+     ],
+     [
+      "gate_40",
+      51.29877552814966
+     ]
+    ],
+    "truncated": false
+   },
+   "error": null,
+   "input_tokens": 0,
+   "output_tokens": 0
+  },
+  {
+   "kind": "llm",
+   "name": "agent_step_5",
+   "start_ms": 15079.3,
+   "duration_ms": 5493.6,
+   "input": {
+    "new_messages": [
+     {
+      "role": "tool",
+      "tool_name": "run_sql",
+      "content": "{\"columns\": [\"version\", \"avg_rounds\"], \"rows\": [[\"gate_30\", 52.45626398210291], [\"gate_40\", 51.29877552814966]], \"truncated\": false}"
+     }
+    ],
+    "context_messages": 10,
+    "tools_offered": [
+     "experiment_overview",
+     "sample_ratio_check",
+     "compare_arms",
+     "power_check",
+     "run_sql"
+    ],
+    "json_schema": false
+   },
+   "output": {
+    "content": "The average number of game rounds played in the control arm (gate_30) is approximately 52.46, and in the treatment arm (gate_40) is approximately 51.30.",
+    "tool_calls": [],
+    "server_timings_ms": {
+     "total_duration": 5491.5,
+     "load_duration": 3.1,
+     "prompt_eval_duration": 1910.8,
+     "eval_duration": 3545.0
+    }
+   },
+   "error": null,
+   "input_tokens": 1248,
+   "output_tokens": 46
+  },
+  {
+   "kind": "llm",
+   "name": "memo",
+   "start_ms": 20573.1,
+   "duration_ms": 19180.5,
+   "input": {
+    "new_messages": [
+     {
+      "role": "user",
+      "content": "Now write the decision memo as JSON.\n- decision: \"ship\", \"do_not_ship\", \"inconclusive\", or \"not_applicable\" if the question is not a ship decision.\n- answer: a short paragraph answering the question.\n- key_numbers: every number the answer uses, as source_tool (the tool that returned it), field (the exact field name in that tool's result) and value (copied exactly).\n- Keep the units used in the tool results (percent, percentage points). Do not convert units or do arithmetic.\n- risks: caveats a decision-maker should know.\nUse only numbers that appear in the tool results above."
+     }
+    ],
+    "context_messages": 12,
+    "tools_offered": [],
+    "json_schema": true
+   },
+   "output": {
+    "content": "{\"decision\": \"not_applicable\", \"answer\": \"The question asks for average game rounds per arm, which is a descriptive statistic rather than a ship decision; however, the control arm (gate_30) had an average of 52.46 rounds and the treatment arm (gate_40) had an average of 51.30 rounds based on the version aggregation query.\", \"key_numbers\": [{\"source_tool\": \"run_sql\", \"field\": \"rows[0][1]\", \"value\": 52.45626398210291}, {\"source_tool\": \"run_sql\", \"field\": \"rows[1][1]\", \"value\": 51.29877552814966}], \"risks\": [\"sum_gamerounds is affected by the treatment and should not be used for segmentation or filtering as per experiment notes.\"]}",
+    "tool_calls": [],
+    "server_timings_ms": {
+     "total_duration": 19175.2,
+     "load_duration": 53.6,
+     "prompt_eval_duration": 4629.4,
+     "eval_duration": 14457.0
+    }
+   },
+   "error": null,
+   "input_tokens": 830,
+   "output_tokens": 196
+  },
+  {
+   "kind": "guardrail",
+   "name": "number_check",
+   "start_ms": 39753.7,
+   "duration_ms": 0.4,
+   "input": {
+    "memo_repairs_so_far": 0
+   },
+   "output": [
+    "key number run_sql.rows[0][1] = 52.45626398210291: no run_sql result has that value in field \"rows[0][1]\"",
+    "key number run_sql.rows[1][1] = 51.29877552814966: no run_sql result has that value in field \"rows[1][1]\""
+   ],
+   "error": null,
+   "input_tokens": 0,
+   "output_tokens": 0
+  },
+  {
+   "kind": "llm",
+   "name": "memo_repair_1",
+   "start_ms": 39754.2,
+   "duration_ms": 13323.6,
+   "input": {
+    "new_messages": [
+     {
+      "role": "user",
+      "content": "These numbers in your memo do not appear in any tool result:\n- key number run_sql.rows[0][1] = 52.45626398210291: no run_sql result has that value in field \"rows[0][1]\"\n- key number run_sql.rows[1][1] = 51.29877552814966: no run_sql result has that value in field \"rows[1][1]\"\nRewrite the memo as JSON. For each one, use the number exactly as written in a tool result,\nin the same units (do not convert, e.g. to basis points), or delete it."
+     }
+    ],
+    "context_messages": 14,
+    "tools_offered": [],
+    "json_schema": true
+   },
+   "output": {
+    "content": "{\"decision\": \"not_applicable\", \"answer\": \"The question asks for average game rounds per arm, which is a descriptive statistic rather than a ship decision; however, the control arm (gate_30) had an average of 52.46 rounds and the treatment arm (gate_40) had an average of 51.30 rounds based on the version aggregation query.\", \"key_numbers\": [{\"source_tool\": \"run_sql\", \"field\": \"rows[0][1]\", \"value\": 52.45626398210291}, {\"source_tool\": \"run_sql\", \"field\": \"rows[1][1]\", \"value\": 51.29877552814966}], \"risks\": [\"sum_gamerounds is affected by the treatment and should not be used for segmentation or filtering as per experiment notes.\"]}",
+    "tool_calls": [],
+    "server_timings_ms": {
+     "total_duration": 13320.7,
+     "load_duration": 52.4,
+     "prompt_eval_duration": 2228.3,
+     "eval_duration": 10910.0
+    }
+   },
+   "error": null,
+   "input_tokens": 1189,
+   "output_tokens": 196
+  },
+  {
+   "kind": "guardrail",
+   "name": "number_check",
+   "start_ms": 53077.9,
+   "duration_ms": 0.3,
+   "input": {
+    "memo_repairs_so_far": 1
+   },
+   "output": [
+    "key number run_sql.rows[0][1] = 52.45626398210291: no run_sql result has that value in field \"rows[0][1]\"",
+    "key number run_sql.rows[1][1] = 51.29877552814966: no run_sql result has that value in field \"rows[1][1]\""
+   ],
+   "error": null,
+   "input_tokens": 0,
+   "output_tokens": 0
+  },
+  {
+   "kind": "guardrail",
+   "name": "decision_policy",
+   "start_ms": 53078.2,
+   "duration_ms": 36.9,
+   "input": {
+    "model_decision": "not_applicable"
+   },
+   "output": {
+    "final_decision": "blocked",
+    "events": [
+     {
+      "rule": "unsupported_numbers",
+      "detail": "key number run_sql.rows[0][1] = 52.45626398210291: no run_sql result has that value in field \"rows[0][1]\"; key number run_sql.rows[1][1] = 51.29877552814966: no run_sql result has that value in field \"rows[1][1]\""
+     }
+    ]
+   },
+   "error": null,
+   "input_tokens": 0,
+   "output_tokens": 0
+  }
+ ],
+ "span_totals": {
+  "llm": {
+   "count": 7,
+   "duration_ms": 52993.8,
+   "errors": 0,
+   "input_tokens": 7065,
+   "output_tokens": 594
+  },
+  "tool": {
+   "count": 4,
+   "duration_ms": 82.7,
+   "errors": 2,
+   "input_tokens": 0,
+   "output_tokens": 0
+  },
+  "guardrail": {
+   "count": 3,
+   "duration_ms": 37.6,
+   "errors": 0,
+   "input_tokens": 0,
+   "output_tokens": 0
+  }
+ }
+}

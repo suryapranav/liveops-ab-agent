@@ -1,0 +1,296 @@
+{
+ "case": "F03",
+ "repeat": 1,
+ "question": "How many players were in each arm?",
+ "trace_id": "60b57dce13eb",
+ "started_at": "2026-11-07T23:17:13+0530",
+ "tool_calls": [
+  {
+   "name": "experiment_overview",
+   "arguments": {},
+   "result": {
+    "experiment": "cookie_cats_real",
+    "control_arm": "gate_30",
+    "treatment_arm": "gate_40",
+    "control_users": 44700,
+    "treatment_users": 45489,
+    "metrics": [
+     "retention_1",
+     "retention_7"
+    ],
+    "primary_metric": "retention_7",
+    "alpha": 0.05,
+    "power_effect_size_pp": 1.0,
+    "planned_users_per_arm": null,
+    "notes": [
+     "power_effect_size_pp is the effect the power check is sized for, not a goal the result must reach.",
+     "sum_gamerounds is affected by the treatment; never segment by it."
+    ]
+   }
+  }
+ ],
+ "messages": [
+  {
+   "role": "system",
+   "content": "You are an A/B test analyst for a mobile game. Answer the user's question about the experiment by calling tools.\n\nRules:\n- Never calculate or guess numbers yourself. Every number you use must come from a tool result.\n- For a ship / don't-ship question, call experiment_overview, sample_ratio_check, then compare_arms and power_check for every metric before deciding.\n- If sample_ratio_check reports srm_detected = true, the data is untrustworthy: do not recommend shipping.\n- Never segment or filter by sum_gamerounds: it is affected by the treatment.\n- When you have what you need, reply in one short paragraph without calling a tool."
+  },
+  {
+   "role": "user",
+   "content": "How many players were in each arm?"
+  },
+  {
+   "role": "assistant",
+   "content": "",
+   "tool_calls": [
+    {
+     "id": "call_81z3z9ub",
+     "function": {
+      "index": 0,
+      "name": "experiment_overview",
+      "arguments": {}
+     }
+    }
+   ]
+  },
+  {
+   "role": "tool",
+   "tool_name": "experiment_overview",
+   "content": "{\"experiment\": \"cookie_cats_real\", \"control_arm\": \"gate_30\", \"treatment_arm\": \"gate_40\", \"control_users\": 44700, \"treatment_users\": 45489, \"metrics\": [\"retention_1\", \"retention_7\"], \"primary_metric\": \"retention_7\", \"alpha\": 0.05, \"power_effect_size_pp\": 1.0, \"planned_users_per_arm\": null, \"notes\": [\"power_effect_size_pp is the effect the power check is sized for, not a goal the result must reach.\", \"sum_gamerounds is affected by the treatment; never segment by it.\"]}"
+  },
+  {
+   "role": "assistant",
+   "content": "The control arm (gate_30) had 44,700 players and the treatment arm (gate_40) had 45,489 players."
+  },
+  {
+   "role": "user",
+   "content": "Now write the decision memo as JSON.\n- decision: \"ship\", \"do_not_ship\", \"inconclusive\", or \"not_applicable\" if the question is not a ship decision.\n- answer: a short paragraph answering the question.\n- key_numbers: every number the answer uses, as source_tool (the tool that returned it), field (the exact field name in that tool's result) and value (copied exactly).\n- Keep the units used in the tool results (percent, percentage points). Do not convert units or do arithmetic.\n- risks: caveats a decision-maker should know.\nUse only numbers that appear in the tool results above."
+  },
+  {
+   "role": "assistant",
+   "content": "{\"decision\": \"not_applicable\", \"answer\": \"This is not a ship decision question; it asks for sample sizes which are factual data points from the experiment overview.\", \"key_numbers\": [{\"source_tool\": \"experiment_overview\", \"field\": \"control_users\", \"value\": 44700}, {\"source_tool\": \"experiment_overview\", \"field\": \"treatment_users\", \"value\": 45489}], \"risks\": []}"
+  }
+ ],
+ "llm_calls": 3,
+ "input_tokens": 2273,
+ "output_tokens": 151,
+ "stop_reason": "model_finished",
+ "memo": {
+  "decision": "not_applicable",
+  "answer": "This is not a ship decision question; it asks for sample sizes which are factual data points from the experiment overview.",
+  "key_numbers": [
+   {
+    "source_tool": "experiment_overview",
+    "field": "control_users",
+    "value": 44700
+   },
+   {
+    "source_tool": "experiment_overview",
+    "field": "treatment_users",
+    "value": 45489
+   }
+  ],
+  "risks": []
+ },
+ "memo_error": null,
+ "memo_repairs": 0,
+ "unsupported_numbers": [],
+ "model_decision": "not_applicable",
+ "final_decision": "not_applicable",
+ "guardrail_events": [],
+ "duration_ms": 14131.0,
+ "spans": [
+  {
+   "kind": "llm",
+   "name": "agent_step_1",
+   "start_ms": 0.1,
+   "duration_ms": 1606.9,
+   "input": {
+    "new_messages": [
+     {
+      "role": "system",
+      "content": "You are an A/B test analyst for a mobile game. Answer the user's question about the experiment by calling tools.\n\nRules:\n- Never calculate or guess numbers yourself. Every number you use must come from a tool result.\n- For a ship / don't-ship question, call experiment_overview, sample_ratio_check, then compare_arms and power_check for every metric before deciding.\n- If sample_ratio_check reports srm_detected = true, the data is untrustworthy: do not recommend shipping.\n- Never segment or filter by sum_gamerounds: it is affected by the treatment.\n- When you have what you need, reply in one short paragraph without calling a tool."
+     },
+     {
+      "role": "user",
+      "content": "How many players were in each arm?"
+     }
+    ],
+    "context_messages": 2,
+    "tools_offered": [
+     "experiment_overview",
+     "sample_ratio_check",
+     "compare_arms",
+     "power_check",
+     "run_sql"
+    ],
+    "json_schema": false
+   },
+   "output": {
+    "content": "",
+    "tool_calls": [
+     {
+      "name": "experiment_overview",
+      "arguments": {}
+     }
+    ],
+    "server_timings_ms": {
+     "total_duration": 1604.7,
+     "load_duration": 4.2,
+     "prompt_eval_duration": 376.8,
+     "eval_duration": 789.6
+    }
+   },
+   "error": null,
+   "input_tokens": 781,
+   "output_tokens": 15
+  },
+  {
+   "kind": "tool",
+   "name": "experiment_overview",
+   "start_ms": 1607.1,
+   "duration_ms": 19.4,
+   "input": {},
+   "output": {
+    "experiment": "cookie_cats_real",
+    "control_arm": "gate_30",
+    "treatment_arm": "gate_40",
+    "control_users": 44700,
+    "treatment_users": 45489,
+    "metrics": [
+     "retention_1",
+     "retention_7"
+    ],
+    "primary_metric": "retention_7",
+    "alpha": 0.05,
+    "power_effect_size_pp": 1.0,
+    "planned_users_per_arm": null,
+    "notes": [
+     "power_effect_size_pp is the effect the power check is sized for, not a goal the result must reach.",
+     "sum_gamerounds is affected by the treatment; never segment by it."
+    ]
+   },
+   "error": null,
+   "input_tokens": 0,
+   "output_tokens": 0
+  },
+  {
+   "kind": "llm",
+   "name": "agent_step_2",
+   "start_ms": 1626.5,
+   "duration_ms": 3325.8,
+   "input": {
+    "new_messages": [
+     {
+      "role": "tool",
+      "tool_name": "experiment_overview",
+      "content": "{\"experiment\": \"cookie_cats_real\", \"control_arm\": \"gate_30\", \"treatment_arm\": \"gate_40\", \"control_users\": 44700, \"treatment_users\": 45489, \"metrics\": [\"retention_1\", \"retention_7\"], \"primary_metric\": \"retention_7\", \"alpha\": 0.05, \"power_effect_size_pp\": 1.0, \"planned_users_per_arm\": null, \"notes\": [\"power_effect_size_pp is the effect the power check is sized for, not a goal the result must reach.\", \"sum_gamerounds is affected by the treatment; never segment by it.\"]}"
+     }
+    ],
+    "context_messages": 4,
+    "tools_offered": [
+     "experiment_overview",
+     "sample_ratio_check",
+     "compare_arms",
+     "power_check",
+     "run_sql"
+    ],
+    "json_schema": false
+   },
+   "output": {
+    "content": "The control arm (gate_30) had 44,700 players and the treatment arm (gate_40) had 45,489 players.",
+    "tool_calls": [],
+    "server_timings_ms": {
+     "total_duration": 3322.7,
+     "load_duration": 28.7,
+     "prompt_eval_duration": 1065.6,
+     "eval_duration": 2200.3
+    }
+   },
+   "error": null,
+   "input_tokens": 959,
+   "output_tokens": 38
+  },
+  {
+   "kind": "llm",
+   "name": "memo",
+   "start_ms": 4952.4,
+   "duration_ms": 9147.1,
+   "input": {
+    "new_messages": [
+     {
+      "role": "user",
+      "content": "Now write the decision memo as JSON.\n- decision: \"ship\", \"do_not_ship\", \"inconclusive\", or \"not_applicable\" if the question is not a ship decision.\n- answer: a short paragraph answering the question.\n- key_numbers: every number the answer uses, as source_tool (the tool that returned it), field (the exact field name in that tool's result) and value (copied exactly).\n- Keep the units used in the tool results (percent, percentage points). Do not convert units or do arithmetic.\n- risks: caveats a decision-maker should know.\nUse only numbers that appear in the tool results above."
+     }
+    ],
+    "context_messages": 6,
+    "tools_offered": [],
+    "json_schema": true
+   },
+   "output": {
+    "content": "{\"decision\": \"not_applicable\", \"answer\": \"This is not a ship decision question; it asks for sample sizes which are factual data points from the experiment overview.\", \"key_numbers\": [{\"source_tool\": \"experiment_overview\", \"field\": \"control_users\", \"value\": 44700}, {\"source_tool\": \"experiment_overview\", \"field\": \"treatment_users\", \"value\": 45489}], \"risks\": []}",
+    "tool_calls": [],
+    "server_timings_ms": {
+     "total_duration": 9143.4,
+     "load_duration": 48.3,
+     "prompt_eval_duration": 2164.1,
+     "eval_duration": 6776.9
+    }
+   },
+   "error": null,
+   "input_tokens": 533,
+   "output_tokens": 98
+  },
+  {
+   "kind": "guardrail",
+   "name": "number_check",
+   "start_ms": 14099.6,
+   "duration_ms": 0.1,
+   "input": {
+    "memo_repairs_so_far": 0
+   },
+   "output": [],
+   "error": null,
+   "input_tokens": 0,
+   "output_tokens": 0
+  },
+  {
+   "kind": "guardrail",
+   "name": "decision_policy",
+   "start_ms": 14099.8,
+   "duration_ms": 31.2,
+   "input": {
+    "model_decision": "not_applicable"
+   },
+   "output": {
+    "final_decision": "not_applicable",
+    "events": []
+   },
+   "error": null,
+   "input_tokens": 0,
+   "output_tokens": 0
+  }
+ ],
+ "span_totals": {
+  "llm": {
+   "count": 3,
+   "duration_ms": 14079.8,
+   "errors": 0,
+   "input_tokens": 2273,
+   "output_tokens": 151
+  },
+  "tool": {
+   "count": 1,
+   "duration_ms": 19.4,
+   "errors": 0,
+   "input_tokens": 0,
+   "output_tokens": 0
+  },
+  "guardrail": {
+   "count": 2,
+   "duration_ms": 31.3,
+   "errors": 0,
+   "input_tokens": 0,
+   "output_tokens": 0
+  }
+ }
+}

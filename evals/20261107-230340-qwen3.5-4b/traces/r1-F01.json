@@ -1,0 +1,321 @@
+{
+ "case": "F01",
+ "repeat": 1,
+ "question": "What is 1-day retention in each arm?",
+ "trace_id": "ec28d8b7828e",
+ "started_at": "2026-11-07T23:16:27+0530",
+ "tool_calls": [
+  {
+   "name": "compare_arms",
+   "arguments": {
+    "metric": "retention_1"
+   },
+   "result": {
+    "metric": "retention_1",
+    "control_rate_pct": 44.82,
+    "treatment_rate_pct": 44.23,
+    "diff_pp": -0.59,
+    "relative_change_pct": -1.32,
+    "ci_low_pp": -1.24,
+    "ci_high_pp": 0.06,
+    "bootstrap_ci_low_pp": -1.23,
+    "bootstrap_ci_high_pp": 0.04,
+    "z": -1.78,
+    "p_value": 0.0744,
+    "alpha": 0.05,
+    "confidence_level_pct": 95.0,
+    "significant": false
+   }
+  }
+ ],
+ "messages": [
+  {
+   "role": "system",
+   "content": "You are an A/B test analyst for a mobile game. Answer the user's question about the experiment by calling tools.\n\nRules:\n- Never calculate or guess numbers yourself. Every number you use must come from a tool result.\n- For a ship / don't-ship question, call experiment_overview, sample_ratio_check, then compare_arms and power_check for every metric before deciding.\n- If sample_ratio_check reports srm_detected = true, the data is untrustworthy: do not recommend shipping.\n- Never segment or filter by sum_gamerounds: it is affected by the treatment.\n- When you have what you need, reply in one short paragraph without calling a tool."
+  },
+  {
+   "role": "user",
+   "content": "What is 1-day retention in each arm?"
+  },
+  {
+   "role": "assistant",
+   "content": "",
+   "tool_calls": [
+    {
+     "id": "call_h6qn8sy4",
+     "function": {
+      "index": 0,
+      "name": "compare_arms",
+      "arguments": {
+       "metric": "retention_1"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "role": "tool",
+   "tool_name": "compare_arms",
+   "content": "{\"metric\": \"retention_1\", \"control_rate_pct\": 44.82, \"treatment_rate_pct\": 44.23, \"diff_pp\": -0.59, \"relative_change_pct\": -1.32, \"ci_low_pp\": -1.24, \"ci_high_pp\": 0.06, \"bootstrap_ci_low_pp\": -1.23, \"bootstrap_ci_high_pp\": 0.04, \"z\": -1.78, \"p_value\": 0.0744, \"alpha\": 0.05, \"confidence_level_pct\": 95.0, \"significant\": false}"
+  },
+  {
+   "role": "assistant",
+   "content": "The 1-day retention rate in the control arm is 44.82%, and in the treatment arm it is 44.23%. The difference is -0.59 percentage points, which is not statistically significant at the 0.05 level (p-value: 0.0744)."
+  },
+  {
+   "role": "user",
+   "content": "Now write the decision memo as JSON.\n- decision: \"ship\", \"do_not_ship\", \"inconclusive\", or \"not_applicable\" if the question is not a ship decision.\n- answer: a short paragraph answering the question.\n- key_numbers: every number the answer uses, as source_tool (the tool that returned it), field (the exact field name in that tool's result) and value (copied exactly).\n- Keep the units used in the tool results (percent, percentage points). Do not convert units or do arithmetic.\n- risks: caveats a decision-maker should know.\nUse only numbers that appear in the tool results above."
+  },
+  {
+   "role": "assistant",
+   "content": "{\"decision\": \"do_not_ship\", \"answer\": \"The 1-day retention rate is 44.82% in the control arm and 44.23% in the treatment arm, resulting in a -0.59 percentage point difference that is not statistically significant (p-value: 0.0744). Since the p-value exceeds the 0.05 alpha threshold, we cannot conclude the treatment improves retention.\", \"key_numbers\": [{\"source_tool\": \"compare_arms\", \"field\": \"control_rate_pct\", \"value\": 44.82}, {\"source_tool\": \"compare_arms\", \"field\": \"treatment_rate_pct\", \"value\": 44.23}, {\"source_tool\": \"compare_arms\", \"field\": \"diff_pp\", \"value\": -0.59}, {\"source_tool\": \"compare_arms\", \"field\": \"p_value\", \"value\": 0.0744}], \"risks\": [\"The treatment shows a slight decrease in 1-day retention compared to control.\", \"The result is not statistically significant at the standard 0.05 level.\"]}"
+  }
+ ],
+ "llm_calls": 3,
+ "input_tokens": 2335,
+ "output_tokens": 340,
+ "stop_reason": "model_finished",
+ "memo": {
+  "decision": "do_not_ship",
+  "answer": "The 1-day retention rate is 44.82% in the control arm and 44.23% in the treatment arm, resulting in a -0.59 percentage point difference that is not statistically significant (p-value: 0.0744). Since the p-value exceeds the 0.05 alpha threshold, we cannot conclude the treatment improves retention.",
+  "key_numbers": [
+   {
+    "source_tool": "compare_arms",
+    "field": "control_rate_pct",
+    "value": 44.82
+   },
+   {
+    "source_tool": "compare_arms",
+    "field": "treatment_rate_pct",
+    "value": 44.23
+   },
+   {
+    "source_tool": "compare_arms",
+    "field": "diff_pp",
+    "value": -0.59
+   },
+   {
+    "source_tool": "compare_arms",
+    "field": "p_value",
+    "value": 0.0744
+   }
+  ],
+  "risks": [
+   "The treatment shows a slight decrease in 1-day retention compared to control.",
+   "The result is not statistically significant at the standard 0.05 level."
+  ]
+ },
+ "memo_error": null,
+ "memo_repairs": 0,
+ "unsupported_numbers": [],
+ "model_decision": "do_not_ship",
+ "final_decision": "blocked",
+ "guardrail_events": [
+  {
+   "rule": "missing_evidence",
+   "detail": "not called: sample_ratio_check(), compare_arms(retention_7), power_check(retention_7)"
+  }
+ ],
+ "duration_ms": 23157.4,
+ "spans": [
+  {
+   "kind": "llm",
+   "name": "agent_step_1",
+   "start_ms": 0.1,
+   "duration_ms": 1992.5,
+   "input": {
+    "new_messages": [
+     {
+      "role": "system",
+      "content": "You are an A/B test analyst for a mobile game. Answer the user's question about the experiment by calling tools.\n\nRules:\n- Never calculate or guess numbers yourself. Every number you use must come from a tool result.\n- For a ship / don't-ship question, call experiment_overview, sample_ratio_check, then compare_arms and power_check for every metric before deciding.\n- If sample_ratio_check reports srm_detected = true, the data is untrustworthy: do not recommend shipping.\n- Never segment or filter by sum_gamerounds: it is affected by the treatment.\n- When you have what you need, reply in one short paragraph without calling a tool."
+     },
+     {
+      "role": "user",
+      "content": "What is 1-day retention in each arm?"
+     }
+    ],
+    "context_messages": 2,
+    "tools_offered": [
+     "experiment_overview",
+     "sample_ratio_check",
+     "compare_arms",
+     "power_check",
+     "run_sql"
+    ],
+    "json_schema": false
+   },
+   "output": {
+    "content": "",
+    "tool_calls": [
+     {
+      "name": "compare_arms",
+      "arguments": {
+       "metric": "retention_1"
+      }
+     }
+    ],
+    "server_timings_ms": {
+     "total_duration": 1988.9,
+     "load_duration": 2.9,
+     "prompt_eval_duration": 239.7,
+     "eval_duration": 1705.3
+    }
+   },
+   "error": null,
+   "input_tokens": 783,
+   "output_tokens": 30
+  },
+  {
+   "kind": "tool",
+   "name": "compare_arms",
+   "start_ms": 1992.6,
+   "duration_ms": 26.2,
+   "input": {
+    "metric": "retention_1"
+   },
+   "output": {
+    "metric": "retention_1",
+    "control_rate_pct": 44.82,
+    "treatment_rate_pct": 44.23,
+    "diff_pp": -0.59,
+    "relative_change_pct": -1.32,
+    "ci_low_pp": -1.24,
+    "ci_high_pp": 0.06,
+    "bootstrap_ci_low_pp": -1.23,
+    "bootstrap_ci_high_pp": 0.04,
+    "z": -1.78,
+    "p_value": 0.0744,
+    "alpha": 0.05,
+    "confidence_level_pct": 95.0,
+    "significant": false
+   },
+   "error": null,
+   "input_tokens": 0,
+   "output_tokens": 0
+  },
+  {
+   "kind": "llm",
+   "name": "agent_step_2",
+   "start_ms": 2018.9,
+   "duration_ms": 5220.2,
+   "input": {
+    "new_messages": [
+     {
+      "role": "tool",
+      "tool_name": "compare_arms",
+      "content": "{\"metric\": \"retention_1\", \"control_rate_pct\": 44.82, \"treatment_rate_pct\": 44.23, \"diff_pp\": -0.59, \"relative_change_pct\": -1.32, \"ci_low_pp\": -1.24, \"ci_high_pp\": 0.06, \"bootstrap_ci_low_pp\": -1.23, \"bootstrap_ci_high_pp\": 0.04, \"z\": -1.78, \"p_value\": 0.0744, \"alpha\": 0.05, \"confidence_level_pct\": 95.0, \"significant\": false}"
+     }
+    ],
+    "context_messages": 4,
+    "tools_offered": [
+     "experiment_overview",
+     "sample_ratio_check",
+     "compare_arms",
+     "power_check",
+     "run_sql"
+    ],
+    "json_schema": false
+   },
+   "output": {
+    "content": "The 1-day retention rate in the control arm is 44.82%, and in the treatment arm it is 44.23%. The difference is -0.59 percentage points, which is not statistically significant at the 0.05 level (p-value: 0.0744).",
+    "tool_calls": [],
+    "server_timings_ms": {
+     "total_duration": 5217.4,
+     "load_duration": 23.4,
+     "prompt_eval_duration": 1460.6,
+     "eval_duration": 3702.1
+    }
+   },
+   "error": null,
+   "input_tokens": 974,
+   "output_tokens": 68
+  },
+  {
+   "kind": "llm",
+   "name": "memo",
+   "start_ms": 7239.1,
+   "duration_ms": 15880.0,
+   "input": {
+    "new_messages": [
+     {
+      "role": "user",
+      "content": "Now write the decision memo as JSON.\n- decision: \"ship\", \"do_not_ship\", \"inconclusive\", or \"not_applicable\" if the question is not a ship decision.\n- answer: a short paragraph answering the question.\n- key_numbers: every number the answer uses, as source_tool (the tool that returned it), field (the exact field name in that tool's result) and value (copied exactly).\n- Keep the units used in the tool results (percent, percentage points). Do not convert units or do arithmetic.\n- risks: caveats a decision-maker should know.\nUse only numbers that appear in the tool results above."
+     }
+    ],
+    "context_messages": 6,
+    "tools_offered": [],
+    "json_schema": true
+   },
+   "output": {
+    "content": "{\"decision\": \"do_not_ship\", \"answer\": \"The 1-day retention rate is 44.82% in the control arm and 44.23% in the treatment arm, resulting in a -0.59 percentage point difference that is not statistically significant (p-value: 0.0744). Since the p-value exceeds the 0.05 alpha threshold, we cannot conclude the treatment improves retention.\", \"key_numbers\": [{\"source_tool\": \"compare_arms\", \"field\": \"control_rate_pct\", \"value\": 44.82}, {\"source_tool\": \"compare_arms\", \"field\": \"treatment_rate_pct\", \"value\": 44.23}, {\"source_tool\": \"compare_arms\", \"field\": \"diff_pp\", \"value\": -0.59}, {\"source_tool\": \"compare_arms\", \"field\": \"p_value\", \"value\": 0.0744}], \"risks\": [\"The treatment shows a slight decrease in 1-day retention compared to control.\", \"The result is not statistically significant at the standard 0.05 level.\"]}",
+    "tool_calls": [],
+    "server_timings_ms": {
+     "total_duration": 15876.9,
+     "load_duration": 47.0,
+     "prompt_eval_duration": 2402.6,
+     "eval_duration": 13355.1
+    }
+   },
+   "error": null,
+   "input_tokens": 578,
+   "output_tokens": 242
+  },
+  {
+   "kind": "guardrail",
+   "name": "number_check",
+   "start_ms": 23119.3,
+   "duration_ms": 0.3,
+   "input": {
+    "memo_repairs_so_far": 0
+   },
+   "output": [],
+   "error": null,
+   "input_tokens": 0,
+   "output_tokens": 0
+  },
+  {
+   "kind": "guardrail",
+   "name": "decision_policy",
+   "start_ms": 23119.6,
+   "duration_ms": 37.7,
+   "input": {
+    "model_decision": "do_not_ship"
+   },
+   "output": {
+    "final_decision": "blocked",
+    "events": [
+     {
+      "rule": "missing_evidence",
+      "detail": "not called: sample_ratio_check(), compare_arms(retention_7), power_check(retention_7)"
+     }
+    ]
+   },
+   "error": null,
+   "input_tokens": 0,
+   "output_tokens": 0
+  }
+ ],
+ "span_totals": {
+  "llm": {
+   "count": 3,
+   "duration_ms": 23092.7,
+   "errors": 0,
+   "input_tokens": 2335,
+   "output_tokens": 340
+  },
+  "tool": {
+   "count": 1,
+   "duration_ms": 26.2,
+   "errors": 0,
+   "input_tokens": 0,
+   "output_tokens": 0
+  },
+  "guardrail": {
+   "count": 2,
+   "duration_ms": 38.0,
+   "errors": 0,
+   "input_tokens": 0,
+   "output_tokens": 0
+  }
+ }
+}

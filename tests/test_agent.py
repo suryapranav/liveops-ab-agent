@@ -10,7 +10,7 @@ from liveops_agent.tools import load_experiment
 GOOD_MEMO = {
     "decision": "inconclusive",
     "answer": "No significant difference.",
-    "key_numbers": [{"label": "diff", "value": -2.0, "source_tool": "compare_arms"}],
+    "key_numbers": [{"source_tool": "compare_arms", "field": "diff_pp", "value": -2.0}],
     "risks": ["Underpowered"],
 }
 NO_NUMBERS_MEMO = {"decision": "inconclusive", "answer": "Unclear.", "key_numbers": [], "risks": []}
@@ -121,7 +121,8 @@ def test_replay_of_live_run_2_is_now_blocked(make_experiment):
 @pytest.mark.parametrize("memo, fragment", [
     ({**GOOD_MEMO, "decision": "yes"}, "decision must be"),
     ({k: v for k, v in GOOD_MEMO.items() if k != "risks"}, "missing fields"),
-    ({**GOOD_MEMO, "key_numbers": [{"label": "x", "value": "45%", "source_tool": "t"}]}, "not a number"),
+    ({**GOOD_MEMO, "key_numbers": [{"field": "x", "value": "45%", "source_tool": "t"}]}, "not a number"),
+    ({**GOOD_MEMO, "key_numbers": [{"label": "x", "value": 1.0, "source_tool": "t"}]}, "bad key_numbers"),
     ([], "JSON object"),
 ])
 def test_parse_memo_rejects(memo, fragment):
@@ -131,7 +132,7 @@ def test_parse_memo_rejects(memo, fragment):
 
 def test_render_memo():
     text = render_memo("Ship?", GOOD_MEMO)
-    assert "`inconclusive`" in text and "| diff | -2.0 | `compare_arms` |" in text
+    assert "`inconclusive`" in text and "| `compare_arms` | `diff_pp` | -2.0 |" in text
     blocked = render_memo("Ship?", GOOD_MEMO, "blocked", [{"rule": "srm", "detail": "p=0.0001"}])
     assert "overridden by guardrails" in blocked and "`srm`: p=0.0001" in blocked
 
