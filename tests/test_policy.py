@@ -20,6 +20,11 @@ def rules(events):
 
 # A big target effect (10 pp) makes 1000 users per arm adequately powered.
 HEALTHY = dict(target_mde_abs=0.10)
+# Default players: 7-day retention 20% vs 18% on 1000/arm, not significant.
+# WINS: 20% vs 26%, a significant increase. LOSES: 20% vs 14%, a significant decrease.
+WINS = dict(ret7_control=200, ret7_treatment=260)
+LOSES = dict(ret7_control=200, ret7_treatment=140)
+SMALL_UP = dict(ret7_control=200, ret7_treatment=215)   # +1.5 pp, not significant
 
 
 def test_healthy_experiment_decision_stands(make_experiment):
@@ -31,24 +36,24 @@ def test_healthy_experiment_decision_stands(make_experiment):
 def test_srm_blocks(make_experiment, decision):
     exp = make_experiment(n_control=1000, n_treatment=1300, **HEALTHY)
     final, events = apply_decision_policy(exp, memo(decision), FULL_EVIDENCE, [])
-    assert final == "blocked" and rules(events) == ["srm"]
+    assert final == "blocked" and "srm" in rules(events)
 
 
 def test_underpowered_blocks(make_experiment):
-    exp = make_experiment(target_mde_abs=0.01)  # 1000/arm cannot detect 1 pp
+    exp = make_experiment(target_mde_abs=0.01, **WINS)  # 1000/arm cannot detect 1 pp
     final, events = apply_decision_policy(exp, memo("ship"), FULL_EVIDENCE, [])
     assert final == "blocked" and rules(events) == ["underpowered"]
 
 
 def test_stopped_early_blocks(make_experiment):
-    exp = make_experiment(planned_users_per_arm=5000, **HEALTHY)
+    exp = make_experiment(planned_users_per_arm=5000, **HEALTHY, **WINS)
     final, events = apply_decision_policy(exp, memo("ship"), FULL_EVIDENCE, [])
     assert final == "blocked" and rules(events) == ["stopped_early"]
 
 
 def test_reaching_the_plan_is_fine(make_experiment):
-    exp = make_experiment(planned_users_per_arm=1000, **HEALTHY)
-    assert apply_decision_policy(exp, memo("ship"), FULL_EVIDENCE, [])[0] == "ship"
+    exp = make_experiment(planned_users_per_arm=1000, **HEALTHY, **WINS)
+    assert apply_decision_policy(exp, memo("ship"), FULL_EVIDENCE, []) == ("ship", [])
 
 
 def test_decision_without_evidence_blocks(make_experiment):
@@ -87,3 +92,44 @@ def test_unsupported_numbers_block_any_decision(make_experiment):
 
 def test_no_memo_is_an_error(make_experiment):
     assert apply_decision_policy(make_experiment(), None, [], []) == ("error", [])
+
+
+@pytest.mark.parametrize("data, decision, allowed", [
+    (WINS, "ship", True),
+    (WINS, "do_not_ship", False),     # throwing away a significant win
+    (LOSES, "ship", False),           # live eval: "ship" on a significant decrease
+    (LOSES, "do_not_ship", True),
+    ({}, "ship", False),              # no significant effect: nothing to ship
+    (SMALL_UP, "ship", False),        # up, but not significantly: still nothing to ship
+    (SMALL_UP, "do_not_ship", True),
+    ({}, "do_not_ship", True),
+])
+def test_decision_must_agree_with_the_primary_metric(make_experiment, data, decision, allowed):
+    exp = make_experiment(**HEALTHY, **data)
+    final, events = apply_decision_policy(exp, memo(decision), FULL_EVIDENCE, [])
+    if allowed:
+        assert (final, events) == (decision, [])
+    else:
+        assert final == "blocked" and rules(events) == ["contradicts_evidence"]
+
+
+def test_contradiction_message_shows_the_evidence(make_experiment):
+    exp = make_experiment(**HEALTHY, **LOSES)
+    _, events = apply_decision_policy(exp, memo("ship"), FULL_EVIDENCE, [])
+    assert "ship requires a significant increase; retention_7 changed -6.00 pp" in events[0].detail
+
+
+def test_no_contradiction_reported_on_untrustworthy_data(make_experiment):
+    # Skewed split where treatment "wins": SRM is the reason to block, and the
+    # artefactual increase must not be reported as evidence against do_not_ship.
+    exp = make_experiment(n_control=1000, n_treatment=1300, ret7_control=200, ret7_treatment=400, **HEALTHY)
+    final, events = apply_decision_policy(exp, memo("do_not_ship"), FULL_EVIDENCE, [])
+    assert final == "blocked" and rules(events) == ["srm"]
+
+
+def test_contradiction_is_reported_even_when_evidence_is_missing(make_experiment):
+    # Live eval F04: "ship" on a significant decrease, with only compare_arms called.
+    # Both problems must be reported (a first version of this rule missed this case).
+    exp = make_experiment(**HEALTHY, **LOSES)
+    final, events = apply_decision_policy(exp, memo("ship"), [FULL_EVIDENCE[1]], [])
+    assert final == "blocked" and rules(events) == ["contradicts_evidence", "missing_evidence"]

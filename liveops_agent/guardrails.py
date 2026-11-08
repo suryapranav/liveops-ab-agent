@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass
 from decimal import Decimal
 
-from liveops_ab import achieved_power, srm_check
+from liveops_ab import achieved_power, srm_check, two_proportion_ztest
 
 # ======================================================================
 # 1. SQL
@@ -242,6 +242,28 @@ def data_validity_events(exp):
     return events
 
 
+def contradicts_evidence(exp, decision):
+    """Does the decision disagree with the primary-metric result? Recomputed from the DB.
+
+    - "ship" needs a significant INCREASE in the primary metric.
+    - "do_not_ship" is wrong if the primary metric significantly increased.
+    (A live eval run had the model say "ship" while its own memo described a
+    significant decrease.) Returns a GuardrailEvent or None."""
+    from .tools import _arm_counts  # local import avoids a circular import
+
+    x_a, n_a, x_b, n_b = _arm_counts(exp, exp.primary_metric)
+    test = two_proportion_ztest(x_a, n_a, x_b, n_b, alpha=exp.alpha)
+    significant_increase = test.p_value < exp.alpha and test.diff > 0
+    observed = f"{exp.primary_metric} changed {100 * test.diff:+.2f} pp, p={test.p_value:.3g}"
+    if decision == "ship" and not significant_increase:
+        return GuardrailEvent("contradicts_evidence",
+                              f"ship requires a significant increase; {observed}")
+    if decision == "do_not_ship" and significant_increase:
+        return GuardrailEvent("contradicts_evidence",
+                              f"do_not_ship despite a significant increase; {observed}")
+    return None
+
+
 def missing_evidence(exp, tool_calls):
     """Tool calls a ship/do_not_ship decision must be based on."""
     required = [("sample_ratio_check", None),
@@ -259,7 +281,8 @@ def apply_decision_policy(exp, memo, tool_calls, unsupported_numbers):
     - "error"   : no valid memo was produced
     - "blocked" : unsupported numbers in the memo, or a ship/do_not_ship
                   call made despite SRM / early stopping / low power /
-                  missing evidence
+                  missing evidence, or one that contradicts the primary
+                  metric's result
     Validity problems are still reported (as events) on answers that do not
     call a result, so a reader of any answer sees that the data is suspect.
     """
@@ -270,9 +293,16 @@ def apply_decision_policy(exp, memo, tool_calls, unsupported_numbers):
         events.append(GuardrailEvent("unsupported_numbers", "; ".join(unsupported_numbers)))
         return "blocked", events
     if memo["decision"] in CALLS_A_RESULT:
+        # So far `events` holds only data-validity problems. Compare the decision
+        # with the result only when there are none: on a broken split (e.g. the
+        # skewed eval variant) the "increase" is an artefact, not evidence.
+        data_is_trustworthy = not events
         missing = missing_evidence(exp, tool_calls)
         if missing:
             events.append(GuardrailEvent("missing_evidence", "not called: " + ", ".join(missing)))
+        contradiction = contradicts_evidence(exp, memo["decision"]) if data_is_trustworthy else None
+        if contradiction:
+            events.append(contradiction)
         if events:
             return "blocked", events
     return memo["decision"], events

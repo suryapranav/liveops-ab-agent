@@ -5,6 +5,17 @@ memos, built around **guardrails, observability and evals**. Data: the
 Cookie Cats A/B test (~90k players; progression gate at level 30 vs 40;
 1-day and 7-day retention).
 
+## Headline results
+
+30 eval questions on `qwen3.5:4b` running locally (latest run, `evals/20261108-074142-qwen3.5-4b/`):
+
+- **0 wrong ship/no-ship calls reached the user.** The model proposed 17.
+- **9 of 9 calls on broken experiments were blocked** (skewed split, 2% sample, stopped early).
+- **73% of final decisions correct** (22/30), versus 40% for the model's own decisions (12/30).
+- **Limits:** the guardrails cannot make the model read the question. On 7 of 10 factual
+  questions it attached a ship/no-ship verdict, and those were blocked rather than answered.
+  It never answered `inconclusive` on its own.
+
 ## Status
 
 | Step | What | State |
@@ -13,7 +24,7 @@ Cookie Cats A/B test (~90k players; progression gate at level 30 vs 40;
 | 2 | Agent (tools + read-only SQL) that writes a decision memo | **Built**: unit-tested; 2 live runs on `qwen3.5:4b` (below) |
 | 3 | Guardrails enforced in code | **Built**: unit-tested; 3 live runs (below) |
 | 4 | Per-question traces (tool inputs, outputs, latency, tokens) | **Built**: unit-tested; 2 live traces (below) |
-| 5 | ~30-question eval set incl. broken experiments | **Done**: 3 passes on `qwen3.5:4b` (results below) |
+| 5 | ~30-question eval set incl. broken experiments | **Done**: 3 passes before fixes, 1 pass after (results below) |
 
 ## Step 1: analysis toolkit (`liveops_ab/`)
 
@@ -86,6 +97,7 @@ All enforced in code; none rely on the model following the prompt.
 | | `sum_gamerounds` may be aggregated, never used to filter, group or sort | string check |
 | Number provenance | Each `key_numbers` entry `(source_tool, field, value)` must match `result[field]` of a call to that tool exactly; every number in the memo text must match some tool output (rounding allowed, sign ignored, no unit conversions) | regex + comparison; **one** rewrite request, then `blocked` |
 | No winner on bad data | `ship` / `do_not_ship` → `blocked` if: SRM (p < 0.001), arm below `planned_users_per_arm` (stopped early), power < 80% on the primary metric, or SRM / compare / power on the primary metric were never successfully called | code recomputes SRM and power from the database, not from the transcript |
+| Decision agrees with evidence | On trustworthy data: `ship` → `blocked` unless the primary metric rose significantly; `do_not_ship` → `blocked` if it rose significantly | code recomputes the z-test from the database (added after the eval run, see below) |
 
 `inconclusive` and `not_applicable` answers are never blocked for data problems,
 but the problems are attached as warnings. The model's own decision is kept
@@ -238,7 +250,12 @@ Run `evals/20261107-230340-qwen3.5-4b/` (MacBook Air, Ollama, temperature 0, see
 - **Gap found: no guardrail checks that the decision agrees with the evidence.** The
   F04/F06/F08 `ship` calls were caught only because the model had skipped the other checks. A memo
   that ran every check and still said `ship` on a significant negative result would have got
-  through.
+  through. **Closed after this run** with the "decision agrees with evidence" rule. Replayed
+  over the 30 final memos of pass 1, it flags exactly F04, F06 and F08. It is skipped on data that
+  already failed a validity rule, because there the "result" is not evidence. A test replays the
+  F04 case *with* every check run: now blocked by this rule alone. (The first version of the
+  rule also skipped itself when evidence was *missing*, so the replay flagged nothing. Checking
+  the replay before writing this sentence caught it; a regression test covers it.)
 - **P04 ("one word, no checks")**: the model called no tools and claimed there was no data
   for gate_40. A safe miss; no guardrail applies when nothing is claimed.
 - **Repeats are identical** (30/30 cases, same final decision every pass). That is greedy
@@ -259,6 +276,39 @@ Both checker bugs are fixed, with regression tests built from these memos. Flag 
 get specific rewrite feedback ("that field is true/false, not a number"). Re-checking the 90
 first memos with the fixed checker: 39 flagged instead of 46. **The table above is the measured
 run before these fixes.**
+
+### After the fixes: 1 pass, 30 runs (`evals/20261108-074142-qwen3.5-4b/`)
+
+Changes since the run above: the two checker bugs, specific feedback for true/false fields, one
+added line in the memo instruction ("numeric fields only"), and the decision-agrees-with-evidence
+rule. One pass is enough because repeats were identical.
+
+| Metric (per pass) | Before fixes | After fixes |
+|---|---|---|
+| Final decision correct | 21/30 | **22/30** |
+| Model decision correct | 12/30 | 12/30 |
+| Wrong calls reaching the user | 0 | 0 |
+| Calls on bad data blocked | 9/9 | 9/9 |
+| Unnecessary blocks (model was right) | 2 | **0** |
+| Memo rewrites requested / fixed | 15–16 / 8–9 | **6 / 5** |
+| Factual answers with the right numbers | 10/10 | **9/10** |
+| Latency p50 / p95 | 43 s / 78 s | **32 s / 56 s** |
+| Tokens in / out | 4,699 / 547 | 4,339 / 440 |
+
+- **The new rule fired on F04, F06, F08** (`ship` while 7-day retention fell significantly),
+  as the replay predicted. Those runs were also missing SRM/power checks, so they would have
+  been blocked anyway. The rule matters when every check *was* run (covered by a test, not seen live).
+- **Regression, F07 (average game rounds):** same tool calls and SQL results as before, but the
+  memo now leaves the numbers out. The only input that changed was the extra line in the memo
+  instruction. A 4B model's answers can shift on a one-line prompt change elsewhere, which
+  is why the eval runs again after every change.
+- **F05:** the model turns alpha 0.05 into "5%" itself. The rewrite fixed this in the earlier run,
+  but not this time.
+- **Skewed variant (D09–D11, P03):** the model stops after the SRM check fails, which is sensible.
+  Before, these blocks were reported as `unsupported_numbers` (the 3.41e-22 bug). Now the real
+  reason, `srm` + `missing_evidence`, shows.
+- **Known reporting gap:** when a memo has unsupported numbers, the policy reports that and stops,
+  so other reasons (e.g. missing evidence on F05) are not listed. The block itself is unaffected.
 
 ## Run it
 

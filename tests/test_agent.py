@@ -150,3 +150,22 @@ def test_parse_ollama_response():
     assert [(c.name, c.arguments) for c in r.tool_calls] == [
         ("compare_arms", {"metric": "retention_1"}), ("power_check", {"metric": "retention_7"})]
     assert (r.input_tokens, r.output_tokens) == (321, 12)
+
+
+
+def test_replay_of_eval_F04_with_full_evidence_is_blocked(make_experiment):
+    # Live eval F04/F06/F08: "ship" while 7-day retention fell significantly. Those
+    # runs were caught only because checks were skipped. Here every check is run,
+    # so only the contradiction rule can catch it.
+    exp = make_experiment(target_mde_abs=0.10, ret7_control=200, ret7_treatment=140)
+    memo = {"decision": "ship", "answer": "Ship it.", "key_numbers": [], "risks": []}
+    client = ScriptedClient([
+        scripted_tool_call("sample_ratio_check"),
+        scripted_tool_call("compare_arms", {"metric": "retention_7"}),
+        scripted_tool_call("power_check", {"metric": "retention_7"}),
+        scripted_text("done"),
+        scripted_text(json.dumps(memo)),
+    ])
+    run = run_agent("What is the p-value for 7-day retention?", exp, client)
+    assert run.model_decision == "ship" and run.final_decision == "blocked"
+    assert [e["rule"] for e in run.guardrail_events] == ["contradicts_evidence"]
